@@ -82,12 +82,16 @@
     <script src="lib/mnemonic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
     <script type="module">
+        // Add x25519 to the imports
         import { ed25519 } from 'https://unpkg.com/@noble/curves@2.0.1/ed25519.js?module';
         import { secp256k1 } from 'https://unpkg.com/@noble/curves@2.0.1/secp256k1.js?module';
+        import { x25519 } from 'https://unpkg.com/@noble/curves@2.0.1/ed25519.js?module'; 
 
-        window.nobleCurves = { ed25519, secp256k1 };
+        // Assign x25519 so main.js can see it
+        window.nobleCurves = { ed25519, secp256k1, x25519 };
         window.ed25519 = ed25519;
         window.secp256k1 = secp256k1;
+        window.x25519 = x25519;
 
         window.dispatchEvent(new Event('nobleCurvesLoaded'));
     </script>
