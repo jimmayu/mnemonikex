@@ -118,7 +118,7 @@ function updateInputFields() {
     document.getElementById("wordCount").textContent = `Words entered: 0/${wordCount}`;
     document.getElementById("publicKeyHeader").textContent = `Your Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
     document.getElementById("privateKeyHeader").textContent = mode === 'demo' ? "Your Private Key (hidden in demo mode)" : `Your Private Key (${wordCount} words)`;
-    document.getElementById("partnerKeyHeader").textContent = `Enter Your Friend’s Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
+    document.getElementById("partnerKeyHeader").textContent = `Enter Your Buddy’s Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
     document.getElementById("sharedSecretHeader").textContent = "Your Secret Code (12 words)";
 }
 
