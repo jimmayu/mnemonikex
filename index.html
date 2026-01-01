@@ -78,7 +78,19 @@
          - @noble/curves: MIT License, https://github.com/paulmillr/noble-curves
          - mnemonic.js and mn_words.js: MIT License, custom implementation
     -->
-    <script src="https://unpkg.com/@noble/curves@2.0.1/lib/noble-curves.js"></script>
+    <script src="lib/mn_words.js"></script>
+    <script src="lib/mnemonic.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
+    <script type="module">
+        import { ed25519 } from 'https://unpkg.com/@noble/curves@2.0.1/ed25519.js?module';
+        import { secp256k1 } from 'https://unpkg.com/@noble/curves@2.0.1/secp256k1.js?module';
+
+        window.nobleCurves = { ed25519, secp256k1 };
+        window.ed25519 = ed25519;
+        window.secp256k1 = secp256k1;
+
+        window.dispatchEvent(new Event('nobleCurvesLoaded'));
+    </script>
     <script src="lib/mn_words.js"></script>
     <script src="lib/mnemonic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
