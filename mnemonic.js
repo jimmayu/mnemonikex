@@ -45,7 +45,7 @@ var mn_words = [
   "america",  "amigo",    "analog",   "anatomy",  "angel",    "animal",
   "antenna",  "antonio",  "apollo",   "april",    "archive",  "arctic",
   "arizona",  "arnold",   "aroma",    "arthur",   "artist",   "asia",
-  "aspect",   "aspirin",  "athena",   "athlete",  "atlas",    "audio",
+  "aspect",   "aspirin",  "athena",   "athlete",   "atlas",    "audio",
   "august",   "austria",  "axiom",    "aztec",    "balance",  "ballad",
   "banana",   "bandit",   "banjo",    "barcode",  "baron",    "basic",
   "battery",  "belgium",  "berlin",   "bermuda",  "bernard",  "bikini",
@@ -85,7 +85,7 @@ var mn_words = [
   "fidel",    "fiesta",   "figure",   "film",     "filter",   "final",
   "finance",  "finish",   "finland",  "flash",    "florida",  "flower",
   "fluid",    "flute",    "focus",    "ford",     "forest",   "formal",
-  "format",   "formula",  "fortune",  "forum",    "fragile",  "france",
+  "format",   "formula",   "fortune",  "forum",    "fragile",  "france",
   "frank",    "friend",   "frozen",   "future",   "gabriel",  "galaxy",
   "gallery",  "gamma",    "garage",   "garden",   "garlic",   "gemini",
   "general",  "genetic",  "genius",   "germany",  "global",   "gloria",
@@ -100,7 +100,7 @@ var mn_words = [
   "janet",    "japan",    "jargon",   "jazz",     "jeep",     "john",
   "joker",    "jordan",   "jumbo",    "june",     "jungle",   "junior",
   "jupiter",  "karate",   "karma",    "kayak",    "kermit",   "kilo",
-  "king",     "koala",    "korea",    "labor",    "lady",     "lagoon",
+  "king",     "koala",    "korea",    "labor",    "lady",    "lagoon",
   "laptop",   "laser",    "latin",    "lava",     "lecture",  "left",
   "legal",    "lemon",    "level",    "lexicon",  "liberal",  "libra",
   "limbo",    "limit",    "linda",    "linear",   "lion",     "liquid",
@@ -128,7 +128,7 @@ var mn_words = [
   "pagoda",   "palace",   "pamela",   "panama",   "panda",    "panel",
   "panic",    "paradox",  "pardon",   "paris",    "parker",   "parking",
   "parody",   "partner",  "passage",  "passive",  "pasta",    "pastel",
-  "patent",   "patriot",  "patrol",  "patron",   "pegasus",  "pelican",
+  "patent",   "patriot",   "patrol",  "patron",   "pegasus",  "pelican",
   "penguin",  "pepper",   "percent",  "perfect",  "perfume",  "period",
   "permit",   "person",   "peru",     "phone",    "photo",    "piano",
   "picasso",  "picnic",   "picture",  "pigment",  "pilgrim",  "pilot",
@@ -225,7 +225,7 @@ var mn_words = [
   "george",   "giant",     "gilbert",  "gossip",   "gram",     "greek",
   "grille",   "hammer",    "harvest",   "hazard",   "heaven",   "herbert",
   "heroic",   "hexagon",   "husband",  "immune",   "inca",     "inch",
-  "initial",  "isabel",    "ivory",    "jason",    "jerome",   "joel",
+  "initial",  "isabel",    "ivory",    "jason",    "jerome",    "joel",
   "joshua",   "journal",   "judge",    "juliet",   "jump",     "justice",
   "kimono",   "kinetic",   "leonid",   "lima",     "maze",     "medusa",
   "member",   "memphis",   "michael",  "miguel",   "milan",   "mile",
@@ -292,7 +292,7 @@ var mn_words = [
   "region",   "remark",     "rent",     "reward",   "rhino",    "ribbon",
   "rider",    "road",       "rodent",   "round",    "rubber",   "ruby",
   "rufus",    "sabine",     "saddle",   "sailor",   "saint",    "salt",
-  "satire",   "scale",      "scuba",    "season",   "secure",   "shake",
+  "satire",   "scale",      "scuba",    "season",      "secure",   "shake",
   "shallow",  "shannon",    "shave",    "shelf",    "sherman",  "shine",
   "shirt",    "side",       "sinatra",  "sincere",  "size",     "slalom",
   "slow",     "small",      "snow",     "sofia",    "song",     "sound",
@@ -417,4 +417,280 @@ function mn_encode_word (src, n)
  *
  * Return value:
  *   0 - no more words to encode / n is out of range
+ *   number - word index
+ */
+function mn_encode_word_index (src, n)
+{
+  var i, j, word, words_req, words_in_chunk;
+  var chunk, start, end;
+
+  words_req = mn_words_required(src.length);
+  if (n >= words_req) return 0;
+
+  /* Position of word, in bits */
+
+  i = n * 11;
+
+  /* First bit of word */
+
+  start = Math.floor(i / 8);
+
+  /* Last bit of word */
+
+  end = Math.floor((i + 10) / 8);
+
+  /* Extract the 11 bits from the byte array */
+
+  word = 0;
+
+  for (j = 0; j <= (end - start); j++) {
+
+    chunk = src[start + j];
+
+    if (j == 0) {
+
+      chunk &= (0xff << (i % 8));
+
+    }
+
+    if (j == (end - start)) {
+
+      chunk &= (0xff >> (7 - ((i + 10) % 8)));
+
+    }
+
+    word |= (chunk << (8 * (end - start - j)));
+
+  }
+
+  /* Shift to correct position */
+
+  word >>= (8 * (end - start) - 11);
+
+  return word + 1;
+
+}
+
+/*
+ * mn_decode
  *
+ * Description:
+ *  Decode a string of words into binary data.
+ *
+ * Parameters:
+ *  src - string to decode
+ *
+ * Return value:
+ *  Array of bytes
+ */
+function mn_decode (src)
+{
+  var i, j, word, words_req, words_in_chunk;
+  var chunk, start, end;
+  var words = src.split(/[ \t\n\r\f]+/);
+  var data = [];
+
+  words_req = mn_words_required(words.length * 4 / 3);
+
+  if (words_req != words.length) return null;
+
+  for (i = 0; i < words_req; i++) {
+
+    word = mn_word_index(words[i]);
+
+    if (!word) return null;
+
+    word--;
+
+    /* Position of word, in bits */
+
+    j = i * 11;
+
+    /* First bit of word */
+
+    start = Math.floor(j / 8);
+
+    /* Last bit of word */
+
+    end = Math.floor((j + 10) / 8);
+
+    /* Insert the 11 bits into the byte array */
+
+    for (j = 0; j <= (end - start); j++) {
+
+      if (start + j >= data.length) data.push(0);
+
+      chunk = (word >> (8 * (end - start - j))) & 0xff;
+
+      if (j == 0) {
+
+        chunk <<= (j % 8);
+
+        chunk &= (0xff << (j % 8));
+
+        data[start + j] |= chunk;
+
+      } else if (j == (end - start)) {
+
+        chunk >>= (7 - ((i * 11 + 10) % 8));
+
+        chunk &= (0xff >> (7 - ((i * 11 + 10) % 8)));
+
+        data[start + j] |= chunk;
+
+      } else {
+
+        data[start + j] |= chunk;
+
+      }
+
+    }
+
+  }
+
+  return data;
+
+}
+
+/*
+ * mn_encode
+ *
+ * Description:
+ *  Encode binary data into a string of words.
+ *
+ * Parameters:
+ *  src - Array of bytes to encode
+ *  format - Format string for output
+ *
+ * Return value:
+ *  string
+ */
+function mn_encode (src, format)
+{
+  var i, words_req;
+  var result = "";
+
+  if (!format) format = MN_FDEFAULT;
+
+  words_req = mn_words_required(src.length);
+
+  for (i = 0; i < words_req; i++) {
+
+    if (i > 0) {
+
+      if (format[i % format.length] == ' ') {
+
+        result += ' ';
+
+      } else if (format[i % format.length] == '\n') {
+
+        result += '\n';
+
+      } else if (format[i % format.length] == '-') {
+
+        result += '-';
+
+      }
+
+    }
+
+    result += mn_encode_word(src, i);
+
+  }
+
+  return result;
+
+}
+
+/*
+ * mn_close
+ *
+ * Description:
+ *  Close the mnemonic library.
+ *
+ * Parameters:
+ *  None
+ *
+ * Return value:
+ *  None
+ */
+function mn_close ()
+{
+  mn_word_index_map = null;
+}
+
+/*
+ * mn_open
+ *
+ * Description:
+ *  Open the mnemonic library.
+ *
+ * Parameters:
+ *  None
+ *
+ * Return value:
+ *  None
+ */
+function mn_open ()
+{
+  mn_close();
+}
+
+/*
+ * mn_iovec
+ *
+ * Description:
+ *  Encode/decode data using scatter/gather vectors.
+ *
+ * Parameters:
+ *  iov - Array of {data, size} objects
+ *  encode - true to encode, false to decode
+ *
+ * Return value:
+ *  Encoded string or decoded data
+ */
+function mn_iovec (iov, encode)
+{
+  var i, size, data;
+
+  size = 0;
+
+  for (i = 0; i < iov.length; i++) {
+
+    size += iov[i].size;
+
+  }
+
+  data = new Array(size);
+
+  size = 0;
+
+  for (i = 0; i < iov.length; i++) {
+
+    data.splice.apply(data, [size, iov[i].size].concat(iov[i].data));
+
+    size += iov[i].size;
+
+  }
+
+  if (encode) {
+
+    return mn_encode(data);
+
+  } else {
+
+    return mn_decode(data.join(' '));
+
+  }
+
+}
+
+// Export functions
+exports.mn_encode = mn_encode;
+exports.mn_decode = mn_decode;
+exports.mn_words_required = mn_words_required;
+exports.mn_open = mn_open;
+exports.mn_close = mn_close;
+exports.mn_iovec = mn_iovec;
+
+})(typeof exports !== 'undefined' ? exports : (window.mnemonic = {}));
