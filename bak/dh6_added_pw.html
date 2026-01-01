@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X25519 Key Exchange with Mnemonicode</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            font-family: 'Roboto', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        .light-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        textarea, button {
+            padding: 10px;
+            border-radius: 5px;
+        }
+        textarea {
+            width: 100%;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            border: 1px solid #333333;
+            background-color: #2a2a2a;
+            color: #f0f0f0;
+        }
+        button {
+            background-color: #444444;
+            border: none;
+            color: #f0f0f0;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        button:hover {
+            background-color: #555555;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+        }
+        h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        h3 {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #partnerKeyInputs {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(80px, auto));
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .word-label {
+            font-size: 0.9rem;
+            text-align: center;
+            display: block;
+            margin-bottom: 2px;
+            color: #cccccc;
+        }
+        .word-input {
+            width: 100%;
+            max-width: 100px;
+            font-size: 1rem;
+            padding: 4px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+            border: 1px solid #333333;
+            background-color: #2a2a2a;
+            color: #f0f0f0;
+        }
+        input::-webkit-calendar-picker-indicator {
+            display: none;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #333333;
+            color: #f0f0f0;
+            text-align: center;
+            padding: 5px;
+            border-radius: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .copy-btn {
+            margin-left: 10px;
+            padding: 5px 10px;
+            font-size: 0.9rem;
+        }
+        .copy-btn:hover {
+            background-color: #666666;
+        }
+        .warning {
+            color: #ff4444;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        @media (max-width: 480px) {
+            #partnerKeyInputs {
+                grid-template-columns: repeat(3, minmax(80px, auto));
+            }
+            button, textarea {
+                width: 100%;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+</head>
+<body>
+    <button onclick="toggleTheme()">Toggle Dark/Light Mode</button>
+    
+    <h2>X25519 Key Exchange with Mnemonicode</h2>
+    <p><strong>Instructions:</strong> Generate your keypair, share your public key with your partner over a voice call where you can recognize their voice, enter their public key, and compute a shared secret for secure communication.</p>
+    <ol>
+        <li><strong>Step 1:</strong> Generate Keypair
+            <p>Click "Generate Keypair" to create your public and private keys.</p>
+        </li>
+        <li><strong>Step 2:</strong> Share Public Key
+            <p>Call your partner and read your public key (24 words) aloud. Ensure you recognize their voice to confirm their identity.</p>
+        </li>
+        <li><strong>Step 3:</strong> Enter Partner’s Key
+            <p>Have your partner read their public key to you over the call. Enter the 24 words they provide.</p>
+        </li>
+        <li><strong>Step 4:</strong> Compute Shared Secret
+            <p>Click "Compute Shared Secret" to generate a secret for secure communication.</p>
+        </li>
+    </ol>
+
+    <button onclick="generateKeys()">Generate Keypair <span class="loading" style="display:none;">⏳</span></button>
+    
+    <h3>Your Public Key (24 words) <span class="tooltip">?<span class="tooltiptext">Safe to share with your partner.</span></span>
+        <button class="copy-btn" onclick="copyToClipboard('publicKeyMnemonic')">Copy</button></h3>
+    <textarea id="publicKeyMnemonic" rows="4" readonly=""></textarea>
+    <p style="color: #cccccc;"><strong>Tip:</strong> Share this public key with your partner over a voice call (e.g., phone or voice chat) where you can confirm their identity by recognizing their voice. Read the words slowly and clearly to avoid mistakes. If a voice call isn’t possible, use a secure messaging app you trust, but be cautious of interception.</p>
+
+    <h3>Your Private Key (24 words) <span class="tooltip">?<span class="tooltiptext">Never share your private key! Keep it secret.</span></span>
+        <button class="copy-btn" onclick="copyToClipboard('privateKeyMnemonic')">Copy</button></h3>
+    <textarea id="privateKeyMnemonic" rows="4" readonly=""></textarea>
+    <p class="warning">Never share your private key!</p>
+
+    <h3>Enter Partner’s Public Key (24 words) <span class="tooltip">?<span class="tooltiptext">Verify your partner’s public key to ensure secure communication.</span></span></h3>
+    <p style="color: #cccccc;"><strong>Tip:</strong> Have your partner read their public key to you over a voice call. Confirm their identity by recognizing their voice, then enter the 24 words below.</p>
+    <div id="partnerKeyInputs"></div>
+    <p id="wordCount">Words entered: 0/24</p>
+    <datalist id="mnemonicWords"></datalist>
+    
+    <button onclick="deriveSharedSecret()">Compute Shared Secret <span class="loading" style="display:none;">⏳</span></button>
+    
+    <h3>Shared Secret (12 words) <span class="tooltip">?<span class="tooltiptext">Use this secret for secure communication with your partner.</span></span>
+        <button class="copy-btn" onclick="copyToClipboard('sharedSecretMnemonic')">Copy</button></h3>
+    <textarea id="sharedSecretMnemonic" rows="2" readonly=""></textarea>
+    
+    <h3>Suggested Shared Password <span class="tooltip">?<span class="tooltiptext">This password is another way to use your shared secret in apps that require a password. Both you and your partner will have the same password.</span></span>
+        <button class="copy-btn" onclick="copyToClipboard('suggestedSharedPassword')">Copy</button></h3>
+    <textarea id="suggestedSharedPassword" rows="2" readonly=""></textarea>
+    <p style="color: #cccccc;">
+        <strong>Why This Is Here:</strong> The 12-word shared secret above is perfect for sharing over a voice call or memorizing, but some apps need a password instead. This "Suggested Shared Password" is a secure version of the same secret, formatted like a strong password (with letters, numbers, and symbols) that both you and your partner share.
+        <br><br><strong>How It Relates:</strong> This password is created from the same 128-bit shared secret as the 12 words, so it’s just another way to use it. The password and words are equally secure for your needs.
+        <br><br><strong>Suggested Uses:</strong> Copy this password to:
+        - Secure a shared file or folder (e.g., in a password-protected zip).
+        - Set up a shared account or login (e.g., for a messaging app).
+        - Use as a key in an encryption tool (e.g., to encrypt emails or documents).
+        Always share it with your partner over a voice call where you recognize their voice!
+    </p>
+
+    <script src="noble-curves.js"></script>
+    <script src="mn_words.js"></script>
+    <script src="mnemonic.js"></script>
+    <script>
+        // Immediate logs to confirm script loading
+        console.log("Main script started");
+        console.log("nobleCurves immediate check:", typeof nobleCurves);
+        console.log("mnemonic immediate check:", typeof mnemonic);
+        console.log("mn_words immediate check:", typeof mn_words);
+
+        // Global error handler
+        window.onerror = function(msg, url, line) {
+            console.error("Global error:", msg, "at line", line);
+            alert("Oops! Something went wrong. Please try generating a new keypair or refresh the page.");
+        };
+
+        // Copy to clipboard function
+        function copyToClipboard(id) {
+            const textarea = document.getElementById(id);
+            textarea.select();
+            document.execCommand("copy");
+            const button = event.target;
+            button.textContent = "Copied!";
+            setTimeout(() => { button.textContent = "Copy"; }, 2000);
+        }
+
+        // Function to generate a suggested password from 128-bit shared secret
+        function generateSuggestedPassword(sharedSecretBytes) {
+            const charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            let password = '';
+            for (let i = 0; i < 20; i++) {
+                const index = sharedSecretBytes[i % 16] ^ sharedSecretBytes[(i + 1) % 16]; // Simple XOR-based mapping
+                password += charSet[index % charSet.length];
+            }
+            return password;
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            try {
+                console.log("DOMContentLoaded fired");
+
+                if (typeof nobleCurves === "undefined") {
+                    console.error("noble-curves.js not loaded");
+                    alert("Error: noble-curves.js failed to load. Ensure the file is in the same directory.");
+                    return;
+                }
+                if (typeof mnemonic === "undefined") {
+                    console.error("mnemonic.js not loaded");
+                    alert("Error: mnemonic.js failed to load. Ensure the file is in the same directory.");
+                    return;
+                }
+                if (typeof mn_words === "undefined") {
+                    console.error("mn_words not loaded");
+                    alert("Error: mn_words not defined. Check mnemonic.js console logs.");
+                    return;
+                }
+
+                console.log("nobleCurves loaded:", nobleCurves);
+                console.log("mnemonic loaded:", mnemonic);
+                console.log("mn_words loaded:", mn_words);
+
+                const { x25519 } = nobleCurves;
+                let privateKey, publicKey;
+
+                // Create 24 input fields for partner's public key with labels
+                const inputContainer = document.getElementById("partnerKeyInputs");
+                console.log("Input container found:", inputContainer);
+                for (let i = 0; i < 24; i++) {
+                    const label = document.createElement("label");
+                    label.className = "word-label";
+                    label.textContent = `${i + 1}:`;
+                    label.setAttribute("aria-label", `Word number ${i + 1}`);
+                    inputContainer.appendChild(label);
+
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.className = "word-input";
+                    input.maxLength = 7;
+                    input.setAttribute("list", "mnemonicWords");
+                    input.setAttribute("aria-label", `Enter word ${i + 1}`);
+                    input.addEventListener("focus", () => console.log(`Input ${i + 1} focused, list:`, input.getAttribute("list")));
+                    input.addEventListener("input", updateWordCount);
+                    inputContainer.appendChild(input);
+                    console.log(`Created input ${i + 1}/24`);
+                }
+                console.log("Input fields created");
+
+                // Populate datalist with mnemonic words
+                const datalist = document.getElementById("mnemonicWords");
+                mn_words.slice(1).forEach(word => {
+                    const option = document.createElement("option");
+                    option.value = word;
+                    datalist.appendChild(option);
+                });
+                console.log("Datalist populated with mnemonic words", datalist.children.length, "options");
+
+                // Update word count
+                function updateWordCount() {
+                    const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
+                    const filledWords = Array.from(inputs).filter(input => input.value.trim().length > 0).length;
+                    document.getElementById("wordCount").textContent = `Words entered: ${filledWords}/24`;
+                    inputs.forEach(input => {
+                        if (input.value.trim().length > 0 && !mn_words.slice(1).includes(input.value.trim().toLowerCase())) {
+                            input.style.borderColor = "#ff4444";
+                        } else {
+                            input.style.borderColor = "#333333";
+                        }
+                    });
+                }
+
+                window.toggleTheme = function() {
+                    document.body.classList.toggle("light-mode");
+                };
+
+                window.generateKeys = function() {
+                    try {
+                        const loading = document.querySelector("button[onclick='generateKeys()'] .loading");
+                        loading.style.display = "inline";
+                        console.log("Generating keypair...");
+                        privateKey = x25519.utils.randomPrivateKey();
+                        publicKey = x25519.getPublicKey(privateKey);
+                        console.log("Private key (bytes):", privateKey);
+                        console.log("Public key (bytes):", publicKey);
+
+                        const pubKeyMnemonic = mnemonic.encode([...publicKey], "x ");
+                        const privKeyMnemonic = mnemonic.encode([...privateKey], "x ");
+                        console.log("Public key mnemonic:", pubKeyMnemonic);
+                        console.log("Private key mnemonic:", privKeyMnemonic);
+
+                        document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+                        document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
+                        loading.style.display = "none";
+
+                        console.log("Textareas updated. Public mnemonic:", document.getElementById("publicKeyMnemonic").value);
+                    } catch (error) {
+                        console.error("Error in generateKeys:", error);
+                        alert("Oops! Something went wrong. Please try generating a new keypair.");
+                    }
+                };
+
+                window.deriveSharedSecret = function() {
+                    const confirmed = confirm("Have you verified your partner’s identity by recognizing their voice over a call? Press OK to proceed, or Cancel to double-check.");
+                    if (!confirmed) {
+                        return;
+                    }
+                    try {
+                        const loading = document.querySelector("button[onclick='deriveSharedSecret()'] .loading");
+                        loading.style.display = "inline";
+                        console.log("Computing shared secret...");
+                        if (!privateKey) {
+                            alert("Generate your keypair first!");
+                            loading.style.display = "none";
+                            return;
+                        }
+
+                        const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
+                        const partnerKeyWords = Array.from(inputs)
+                            .map(input => input.value.trim())
+                            .filter(word => word.length > 0);
+                        
+                        console.log("Collected words:", partnerKeyWords);
+                        if (partnerKeyWords.length !== 24) {
+                            alert("Please enter exactly 24 words for the partner’s public key!");
+                            loading.style.display = "none";
+                            return;
+                        }
+
+                        const validWords = new Set(mn_words.slice(1));
+                        const invalidWords = partnerKeyWords.filter(word => !validWords.has(word.toLowerCase()));
+                        if (invalidWords.length > 0) {
+                            console.error("Invalid words found:", invalidWords);
+                            alert(`Invalid words: ${invalidWords.join(", ")}. Please use words from the mnemonic list.`);
+                            loading.style.display = "none";
+                            return;
+                        }
+
+                        const partnerKeyMnemonic = partnerKeyWords.join(" ");
+                        console.log("Partner key mnemonic:", partnerKeyMnemonic);
+
+                        const partnerKeyBytes = mnemonic.decode(partnerKeyMnemonic);
+                        console.log("Decoded bytes length:", partnerKeyBytes.length);
+                        if (partnerKeyBytes.length !== 32) {
+                            throw new Error("Public key must decode to 32 bytes (24 words)");
+                        }
+                        const partnerKey = new Uint8Array(partnerKeyBytes);
+
+                        try {
+                            console.log("Validating partner key...");
+                            x25519.getSharedSecret(privateKey, partnerKey);
+                        } catch (e) {
+                            console.error("X25519 validation error:", e);
+                            throw new Error("Invalid X25519 public key");
+                        }
+
+                        const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+                        const sharedSecretShort = sharedSecretFull.slice(0, 16); // 128-bit shared secret
+                        const sharedSecretMnemonic = mnemonic.encode([...sharedSecretShort], "x ");
+                        const suggestedPassword = generateSuggestedPassword(sharedSecretShort);
+
+                        console.log("Shared secret mnemonic:", sharedSecretMnemonic);
+                        console.log("Suggested shared password:", suggestedPassword);
+
+                        document.getElementById("sharedSecretMnemonic").value = sharedSecretMnemonic;
+                        document.getElementById("suggestedSharedPassword").value = suggestedPassword;
+                        loading.style.display = "none";
+                    } catch (error) {
+                        console.error("Error in deriveSharedSecret:", error);
+                        alert("Oops! Something went wrong. Please check the partner’s public key and try again.");
+                        loading.style.display = "none";
+                    }
+                };
+            } catch (error) {
+                console.error("Error in DOMContentLoaded:", error);
+                alert("Error in initialization: " + error.message);
+            }
+        });
+
+        // Function to generate a suggested password from 128-bit shared secret
+        function generateSuggestedPassword(sharedSecretBytes) {
+            const charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            let password = '';
+            for (let i = 0; i < 20; i++) {
+                const index = sharedSecretBytes[i % 16] ^ sharedSecretBytes[(i + 1) % 16]; // Simple XOR-based mapping
+                password += charSet[index % charSet.length];
+            }
+            return password;
+        }
+    </script>
+</body>
+</html>
