@@ -116,7 +116,8 @@ function updateInputFields() {
             minChars: 2,
             maxItems: 5,
             autoFirst: true,
-            filter: (text, input) => text.toLowerCase().startsWith(input.toLowerCase())
+            filter: (text, input) => text.toLowerCase().startsWith(input.toLowerCase()),
+            emptyMsg: ""
         });
     }
 
