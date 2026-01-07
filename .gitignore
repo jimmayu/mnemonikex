@@ -26,3 +26,4 @@ __pycache__/
 # Archives
 *.zip
 *.rar
+.aider*
