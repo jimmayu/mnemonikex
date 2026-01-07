@@ -78,7 +78,11 @@
          - @noble/curves: MIT License, https://github.com/paulmillr/noble-curves
          - mnemonic.js and mn_words.js: MIT License, custom implementation
     -->
-    <script src="noble-curves.js"></script>
+    <script type="module">
+        import * as curves from 'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/+esm';
+        window.nobleCurves = curves;
+        console.log("noble-curves loaded from CDN:", typeof window.nobleCurves);
+    </script>
     <script src="mn_words.js"></script>
     <script src="mnemonic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
