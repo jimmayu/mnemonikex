@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X25519 Key Exchange with Mnemonicode</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+        }
+        .light-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        textarea {
+            width: 100%;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            padding: 8px;
+        }
+        #partnerKeyInputs {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(80px, auto)); /* 6 columns, min 80px per input */
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .word-label {
+            font-size: 0.9rem;
+            text-align: center;
+            display: block; /* Stack label above input */
+            margin-bottom: 2px;
+        }
+        .word-input {
+            width: 100%; /* Full width of grid cell */
+            max-width: 100px; /* Limit to ~7 characters */
+            font-size: 1rem;
+            padding: 4px;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+        }
+        /* Optional: Style the datalist dropdown (browser-dependent) */
+        input::-webkit-calendar-picker-indicator {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleTheme()">Toggle Dark/Light Mode</button>
+    
+    <h2>X25519 Key Exchange with Mnemonicode</h2>
+    <p>Keys and secrets are encoded as ~12-24 words for easy sharing.</p>
+    
+    <button onclick="generateKeys()">Generate Keypair</button>
+    
+    <!-- <h3>Your Public Key (Raw Hex)</h3> -->
+    <!-- <textarea id="publicKeyHex" rows="2" readonly=""></textarea> -->
+    <h3>Your Public Key (24 words)</h3>
+    <textarea id="publicKeyMnemonic" rows="4" readonly=""></textarea>
+
+    <!-- <h3>Your Private Key (Raw Hex)</h3> -->
+    <!-- <textarea id="privateKeyHex" rows=2" readonly=""></textarea> -->
+    <h3>Your Private Key (24 words)</h3>
+    <textarea id="privateKeyMnemonic" rows="4" readonly=""></textarea>
+
+    <h3>Enter Partner's Public Key (24 words)</h3>
+    <div id="partnerKeyInputs"></div>
+    <datalist id="mnemonicWords"></datalist>
+    
+    <button onclick="deriveSharedSecret()">Compute Shared Secret</button>
+    
+    <!-- <h3>Shared Secret (Raw Hex)</h3> -->
+    <!-- <textarea id="sharedSecretHex" rows="1" readonly=""></textarea> -->
+    <h3>Shared Secret (12 words)</h3>
+    <textarea id="sharedSecretMnemonic" rows="2" readonly=""></textarea>
+
+    <script src="noble-curves.js"></script>
+    <script src="mn_words.js"></script>
+    <script src="mnemonic.js"></script>
+    <script>
+        // Immediate logs to confirm script loading
+        console.log("Main script started");
+        console.log("nobleCurves immediate check:", typeof nobleCurves);
+        console.log("mnemonic immediate check:", typeof mnemonic);
+        console.log("mn_words immediate check:", typeof mn_words);
+
+        // Global error handler
+        window.onerror = function(msg, url, line) {
+            console.error("Global error:", msg, "at line", line);
+            alert("JavaScript error: " + msg + " at line " + line);
+        };
+
+        document.addEventListener("DOMContentLoaded", function() {
+            try {
+                console.log("DOMContentLoaded fired");
+
+                if (typeof nobleCurves === "undefined") {
+                    console.error("noble-curves.js not loaded");
+                    alert("Error: noble-curves.js failed to load. Ensure the file is in the same directory.");
+                    return;
+                }
+                if (typeof mnemonic === "undefined") {
+                    console.error("mnemonic.js not loaded");
+                    alert("Error: mnemonic.js failed to load. Ensure the file is in the same directory.");
+                    return;
+                }
+                if (typeof mn_words === "undefined") {
+                    console.error("mn_words not loaded");
+                    alert("Error: mn_words not defined. Check mnemonic.js console logs.");
+                    return;
+                }
+
+                console.log("nobleCurves loaded:", nobleCurves);
+                console.log("mnemonic loaded:", mnemonic);
+                console.log("mn_words loaded:", mn_words);
+
+                const { x25519 } = nobleCurves;
+                let privateKey, publicKey;
+
+                // Create 24 input fields for partner's public key with labels
+                const inputContainer = document.getElementById("partnerKeyInputs");
+                console.log("Input container found:", inputContainer);
+                for (let i = 0; i < 24; i++) {
+                    // Create label for word number
+                    const label = document.createElement("label");
+                    label.className = "word-label";
+                    label.textContent = `${i + 1}:`;
+                    inputContainer.appendChild(label);
+
+                    // Create input field
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.className = "word-input";
+                    input.maxLength = 7;
+                    input.setAttribute("list", "mnemonicWords");
+                    input.addEventListener("focus", () => console.log(`Input ${i + 1} focused, list:`, input.getAttribute("list")));
+                    inputContainer.appendChild(input);
+                    console.log(`Created input ${i + 1}/24`);
+                }
+                console.log("Input fields created");
+
+                // Populate datalist with mnemonic words
+                const datalist = document.getElementById("mnemonicWords");
+                mn_words.slice(1).forEach(word => {
+                    const option = document.createElement("option");
+                    option.value = word;
+                    datalist.appendChild(option);
+                });
+                console.log("Datalist populated with mnemonic words", datalist.children.length, "options");
+
+                window.toggleTheme = function() {
+                    document.body.classList.toggle("light-mode");
+                };
+
+                window.generateKeys = function() {
+                    try {
+                        console.log("Generating keypair...");
+                        privateKey = x25519.utils.randomPrivateKey();
+                        publicKey = x25519.getPublicKey(privateKey);
+                        console.log("Private key (bytes):", privateKey);
+                        console.log("Public key (bytes):", publicKey);
+
+                        const pubKeyMnemonic = mnemonic.encode([...publicKey], "x ");
+                        const privKeyMnemonic = mnemonic.encode([...privateKey], "x ");
+                        console.log("Public key mnemonic:", pubKeyMnemonic);
+                        console.log("Private key mnemonic:", privKeyMnemonic);
+
+                        document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+                        document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
+
+                        console.log("Textareas updated. Public mnemonic:", document.getElementById("publicKeyMnemonic").value);
+                    } catch (error) {
+                        console.error("Error in generateKeys:", error);
+                        alert("Failed to generate keys: " + error.message);
+                    }
+                };
+
+                window.deriveSharedSecret = function() {
+                    try {
+                        console.log("Computing shared secret...");
+                        if (!privateKey) {
+                            alert("Generate your keypair first!");
+                            return;
+                        }
+
+                        const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
+                        const partnerKeyWords = Array.from(inputs)
+                            .map(input => input.value.trim())
+                            .filter(word => word.length > 0);
+                        
+                        console.log("Collected words:", partnerKeyWords);
+                        if (partnerKeyWords.length !== 24) {
+                            alert("Please enter exactly 24 words for the partner's public key!");
+                            return;
+                        }
+
+                        // Validate words against mn_words
+                        const validWords = new Set(mn_words.slice(1)); // Skip undefined
+                        const invalidWords = partnerKeyWords.filter(word => !validWords.has(word));
+                        if (invalidWords.length > 0) {
+                            console.error("Invalid words found:", invalidWords);
+                            throw new Error("Invalid words: " + invalidWords.join(", "));
+                        }
+
+                        const partnerKeyMnemonic = partnerKeyWords.join(" ");
+                        console.log("Partner key mnemonic:", partnerKeyMnemonic);
+
+                        const partnerKeyBytes = mnemonic.decode(partnerKeyMnemonic);
+                        console.log("Decoded bytes length:", partnerKeyBytes.length);
+                        if (partnerKeyBytes.length !== 32) {
+                            throw new Error("Public key must decode to 32 bytes (24 words)");
+                        }
+                        const partnerKey = new Uint8Array(partnerKeyBytes);
+
+                        try {
+                            console.log("Validating partner key...");
+                            x25519.getSharedSecret(privateKey, partnerKey);
+                        } catch (e) {
+                            console.error("X255X validation error:", e);
+                            throw new Error("Invalid X25519 public key: " + e.message);
+                        }
+
+                        const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+                        const sharedSecretShort = sharedSecretFull.slice(0, 16);
+                        const sharedSecretMnemonic = mnemonic.encode([...sharedSecretShort], "x ");
+                        console.log("Shared secret mnemonic:", sharedSecretMnemonic);
+
+                        document.getElementById("sharedSecretMnemonic").value = sharedSecretMnemonic;
+                    } catch (error) {
+                        console.error("Error in deriveSharedSecret:", error);
+                        alert("Error: " + (error.message || "Unknown error occurred"));
+                    }
+                };
+            } catch (error) {
+                console.error("Error in DOMContentLoaded:", error);
+                alert("Error in initialization: " + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

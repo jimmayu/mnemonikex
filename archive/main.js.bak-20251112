@@ -1,0 +1,222 @@
+console.log("Main script started");
+console.log("nobleCurves immediate check:", typeof nobleCurves);
+console.log("mnemonic immediate check:", typeof mnemonic);
+console.log("mn_words immediate check:", typeof mn_words);
+
+window.onerror = function(msg, url, line) {
+    console.error("Global error:", msg, "at line", line);
+    alert("Oops! Something went wrong. Try refreshing the page or starting over.");
+};
+
+function copyToClipboard(id) {
+    const textarea = document.getElementById(id);
+    textarea.select();
+    document.execCommand("copy");
+    const button = event.target;
+    button.textContent = "Copied!";
+    setTimeout(() => { button.textContent = "Copy"; }, 2000);
+}
+
+function generateSuggestedPassword(sharedSecretBytes) {
+    const charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    const byteLength = sharedSecretBytes.length;
+    let len;
+    if (byteLength === 16) {
+        len = 20; // ~128 bits: 20 chars (~6 bits each)
+    } else {
+        len = Math.max(12, Math.ceil(byteLength * 8 / 6)); // Fallback: bits to chars (~6 bits/char)
+    }
+    console.log(`Generating password for ${byteLength} bytes, target length: ${len}`);
+    for (let i = 0; i < len; i++) {
+        const index = sharedSecretBytes[i % byteLength] ^ sharedSecretBytes[(i + 1) % byteLength];
+        password += charSet[index % charSet.length];
+    }
+    console.log(`Generated password length: ${password.length}, value: ${password}`);
+    if (password.length !== len) {
+        console.warn(`Password length mismatch: expected ${len}, got ${password.length}`);
+        password = password.slice(0, len); // Enforce exact length
+    }
+    return password;
+}
+
+function updateWordCount() {
+    const inputs = document.querySelectorAll("#partnerKeyInputs .input-pair .word-input");
+    const filledWords = Array.from(inputs).filter(input => input.value.trim().length > 0).length;
+    document.getElementById("wordCount").textContent = `Words entered: ${filledWords}/24`;
+    inputs.forEach(input => {
+        if (input.value.trim().length > 0 && !mn_words.slice(1).includes(input.value.trim().toLowerCase())) {
+            input.style.borderColor = "#ff4444";
+        } else {
+            input.style.borderColor = "";
+        }
+    });
+}
+
+function updateInputFields() {
+    const inputContainer = document.getElementById("partnerKeyInputs");
+    inputContainer.innerHTML = '';
+    console.log("Updating input fields for 24 words");
+    for (let i = 0; i < 24; i++) {
+        const pairDiv = document.createElement("div");
+        pairDiv.className = "input-pair";
+        const label = document.createElement("label");
+        label.className = "word-label";
+        label.textContent = `${i + 1}:`;
+        label.setAttribute("aria-label", `Word number ${i + 1}`);
+        pairDiv.appendChild(label);
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "word-input";
+        input.maxLength = 7;
+        input.setAttribute("aria-label", `Enter word ${i + 1}`);
+        input.addEventListener("input", updateWordCount);
+        pairDiv.appendChild(input);
+        new Awesomplete(input, {
+            list: mn_words.slice(1),
+            minChars: 2,
+            maxItems: 5,
+            autoFirst: true,
+            filter: (text, input) => {
+                return text.toLowerCase().startsWith(input.toLowerCase());
+            }
+        });
+        inputContainer.appendChild(pairDiv);
+    }
+    console.log("Created 24 input pairs");
+    document.getElementById("wordCount").textContent = "Words entered: 0/24";
+    document.getElementById("publicKeyHeader").textContent = "Your Public Address (24 words)";
+    document.getElementById("privateKeyHeader").textContent = "Your Private Key (24 words)";
+    document.getElementById("partnerKeyHeader").textContent = "Enter Your Friend’s Public Address (24 words)";
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    try {
+        console.log("DOMContentLoaded fired");
+        if (typeof nobleCurves === "undefined") {
+            console.error("noble-curves.js not loaded");
+            alert("Error: noble-curves.js failed to load. Ensure the file is in the same directory.");
+            return;
+        }
+        if (typeof mnemonic === "undefined") {
+            console.error("mnemonic.js not loaded");
+            alert("Error: mnemonic.js failed to load. Ensure the file is in the same directory.");
+            return;
+        }
+        if (typeof mn_words === "undefined") {
+            console.error("mn_words not loaded");
+            alert("Error: mn_words not defined. Check mnemonic.js console logs.");
+            return;
+        }
+        if (typeof Awesomplete === "undefined") {
+            console.error("awesomplete.min.js not loaded");
+            alert("Error: Autocomplete library failed to load. Ensure awesomplete.min.js is in the awesomplete-gh-pages directory.");
+            return;
+        }
+        console.log("nobleCurves loaded:", nobleCurves);
+        console.log("mnemonic loaded:", mnemonic);
+        console.log("mn_words loaded:", mn_words);
+        console.log("Awesomplete loaded:", Awesomplete);
+
+        const { x25519 } = nobleCurves;
+        let privateKey, publicKey;
+
+        updateInputFields();
+
+        window.toggleTheme = function() {
+            document.body.classList.toggle("light-mode");
+            const toggleButton = document.querySelector("button[onclick='toggleTheme()']");
+            toggleButton.textContent = document.body.classList.contains("light-mode") ? "Switch to Dark Mode" : "Switch to Light Mode";
+        };
+
+        window.generateKeys = function() {
+            try {
+                const loading = document.querySelector("button[onclick='generateKeys()'] .loading");
+                loading.style.display = "inline";
+                console.log("Generating keypair...");
+                privateKey = x25519.utils.randomPrivateKey();
+                publicKey = x25519.getPublicKey(privateKey);
+                console.log("Private key (bytes):", privateKey);
+                console.log("Public key (bytes):", publicKey);
+                const pubKeyMnemonic = mnemonic.encode([...publicKey], "x ");
+                const privKeyMnemonic = mnemonic.encode([...privateKey], "x ");
+                console.log("Public key mnemonic:", pubKeyMnemonic);
+                console.log("Private key mnemonic:", privKeyMnemonic);
+                document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+                document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
+                loading.style.display = "none";
+                console.log("Textareas updated. Public mnemonic:", document.getElementById("publicKeyMnemonic").value);
+            } catch (error) {
+                console.error("Error in generateKeys:", error.message, error.stack);
+                alert("Oops! Something went wrong. Try creating your codes again.");
+            }
+        };
+
+        window.deriveSharedSecret = function() {
+            const confirmed = confirm("Have you confirmed your friend’s voice over a call to ensure it’s really them? Press OK to continue, or Cancel to check again.");
+            if (!confirmed) {
+                return;
+            }
+            try {
+                const loading = document.querySelector("button[onclick='deriveSharedSecret()'] .loading");
+                loading.style.display = "inline";
+                console.log("Computing shared secret...");
+                if (!privateKey) {
+                    alert("Create your codes first!");
+                    loading.style.display = "none";
+                    return;
+                }
+                const inputs = document.querySelectorAll("#partnerKeyInputs .input-pair .word-input");
+                const partnerKeyWords = Array.from(inputs)
+                    .map(input => input.value.trim())
+                    .filter(word => word.length > 0);
+                console.log("Collected words:", partnerKeyWords);
+                if (partnerKeyWords.length !== 24) {
+                    alert("Please enter exactly 24 words for your friend’s public address!");
+                    loading.style.display = "none";
+                    return;
+                }
+                const validWords = new Set(mn_words.slice(1));
+                const invalidWords = partnerKeyWords.filter(word => !validWords.has(word.toLowerCase()));
+                if (invalidWords.length > 0) {
+                    console.error("Invalid words found:", invalidWords);
+                    alert(`Invalid words: ${invalidWords.join(", ")}. Please use words from the suggested list.`);
+                    loading.style.display = "none";
+                    return;
+                }
+                const partnerKeyMnemonic = partnerKeyWords.join(" ");
+                console.log("Partner key mnemonic:", partnerKeyMnemonic);
+                const partnerKeyBytes = mnemonic.decode(partnerKeyMnemonic);
+                console.log("Decoded bytes length:", partnerKeyBytes.length);
+                if (partnerKeyBytes.length !== 32) {
+                    throw new Error("Public address must decode to 32 bytes (24 words)");
+                }
+                const partnerKey = new Uint8Array(partnerKeyBytes);
+                try {
+                    console.log("Validating partner key...");
+                    x25519.getSharedSecret(privateKey, partnerKey);
+                } catch (e) {
+                    console.error("X25519 validation error:", e);
+                    throw new Error("Invalid X25519 public address");
+                }
+                const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+                const sharedSecretShort = sharedSecretFull.slice(0, 16); // 128-bit shared secret
+                const sharedSecretMnemonic = mnemonic.encode([...sharedSecretShort], "x ");
+                const suggestedPassword = generateSuggestedPassword(sharedSecretShort);
+                console.log("Shared secret mnemonic:", sharedSecretMnemonic);
+                console.log("Suggested shared password:", suggestedPassword);
+                document.getElementById("sharedSecretMnemonic").value = sharedSecretMnemonic;
+                document.getElementById("suggestedSharedPassword").value = suggestedPassword;
+                document.getElementById("sharedSecretHeader").textContent = "Your Secret Code (12 words)";
+                loading.style.display = "none";
+            } catch (error) {
+                console.error("Error in deriveSharedSecret:", error.message, error.stack);
+                alert("Oops! Something went wrong. Check your friend’s public address and try again.");
+                loading.style.display = "none";
+            }
+        };
+    } catch (error) {
+        console.error("Error in DOMContentLoaded:", error.message, error.stack);
+        alert("Error starting the app: " + error.message);
+    }
+});

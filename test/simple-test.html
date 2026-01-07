@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Test</title>
+</head>
+<body>
+    <h1>Testing noble-curves loading</h1>
+    <div id="result">Loading...</div>
+
+    <script type="module">
+        import * as curves from 'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/+esm';
+        window.nobleCurves = curves;
+        console.log("noble-curves loaded:", typeof window.nobleCurves);
+        console.log("x25519 available:", typeof window.nobleCurves.x25519);
+
+        // Test if it works
+        try {
+            const testPriv = crypto.getRandomValues(new Uint8Array(32));
+            testPriv[0] &= 248;
+            testPriv[31] &= 127;
+            testPriv[31] |= 64;
+            const testPub = window.nobleCurves.x25519.getPublicKey(testPriv);
+            console.log("Generated test public key:", testPub);
+            document.getElementById('result').innerHTML =
+                '✅ SUCCESS: noble-curves loaded and working!<br>' +
+                'Type: ' + typeof window.nobleCurves + '<br>' +
+                'x25519: ' + typeof window.nobleCurves.x25519 + '<br>' +
+                'Test key length: ' + testPub.length;
+            document.getElementById('result').style.color = 'green';
+        } catch (error) {
+            console.error("Error:", error);
+            document.getElementById('result').innerHTML = '❌ ERROR: ' + error.message;
+            document.getElementById('result').style.color = 'red';
+        }
+    </script>
+</body>
+</html>

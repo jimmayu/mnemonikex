@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X25519 Key Exchange with Mnemonicode</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+        }
+        .light-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        textarea {
+            width: 100%;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleTheme()">Toggle Dark/Light Mode</button>
+    
+    <h2>X25519 Key Exchange with Mnemonicode</h2>
+    <p>Keys and secrets are encoded as ~12-24 words for easy sharing.</p>
+    
+    <button onclick="generateKeys()">Generate Keypair</button>
+    
+    <!-- <h3>Your Public Key (Raw Hex)</h3> -->
+    <!-- <textarea id="publicKeyHex" rows="2" readonly=""></textarea> -->
+    <h3>Your Public Key (24 words)</h3>
+    <textarea id="publicKeyMnemonic" rows="4" readonly=""></textarea>
+
+    <!-- <h3>Your Private Key (Raw Hex)</h3> -->
+    <!-- <textarea id="privateKeyHex" rows="2" readonly=""></textarea> -->
+    <h3>Your Private Key (24 words)</h3>
+    <textarea id="privateKeyMnemonic" rows="4" readonly=""></textarea>
+
+    <h3>Enter Partner's Public Key (24 words)</h3>
+    <textarea id="partnerKeyMnemonic" rows="4"></textarea>
+    
+    <button onclick="deriveSharedSecret()">Compute Shared Secret</button>
+    
+    <!-- <h3>Shared Secret (Raw Hex)</h3> -->
+    <!-- <textarea id="sharedSecretHex" rows="1" readonly=""></textarea> -->
+    <h3>Shared Secret (12 words)</h3>
+    <textarea id="sharedSecretMnemonic" rows="2" readonly=""></textarea>
+
+    <script src="noble-curves.js"></script>
+    <script src="mnemonic.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof nobleCurves === "undefined") {
+                alert("Error: noble-curves.js failed to load. Ensure the file is in the same directory.");
+                return;
+            }
+            if (typeof mnemonic === "undefined") {
+                alert("Error: mnemonic.js failed to load. Ensure the file is in the same directory.");
+                return;
+            }
+
+            console.log("nobleCurves loaded:", nobleCurves);
+            console.log("mnemonic loaded:", mnemonic);
+
+            const { x25519 } = nobleCurves;
+            let privateKey, publicKey;
+
+            // Utility to convert Uint8Array to hex string (kept for debugging)
+            /* function bytesToHex(bytes) {
+                return Array.from(bytes)
+                    .map(b => b.toString(16).padStart(2, "0"))
+                    .join("");
+            } */
+
+            window.toggleTheme = function() {
+                document.body.classList.toggle("light-mode");
+            };
+
+            window.generateKeys = function() {
+                try {
+                    console.log("Generating keypair...");
+                    privateKey = x25519.utils.randomPrivateKey();
+                    publicKey = x25519.getPublicKey(privateKey);
+                    console.log("Private key (bytes):", privateKey);
+                    console.log("Public key (bytes):", publicKey);
+
+                    // Raw hex output (commented for cleanup)
+                    /* const pubKeyHex = bytesToHex(publicKey);
+                    const privKeyHex = bytesToHex(privateKey);
+                    console.log("Public key (hex):", pubKeyHex);
+                    console.log("Private key (hex):", privKeyHex); */
+
+                    const pubKeyMnemonic = mnemonic.encode([...publicKey], "x ");
+                    const privKeyMnemonic = mnemonic.encode([...privateKey], "x ");
+                    console.log("Public key mnemonic:", pubKeyMnemonic);
+                    console.log("Private key mnemonic:", privKeyMnemonic);
+
+                    // Update DOM (hex outputs commented out)
+                    /* document.getElementById("publicKeyHex").value = pubKeyHex;
+                    document.getElementById("privateKeyHex").value = privKeyHex; */
+                    document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+                    document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
+
+                    console.log("Textareas updated. Public mnemonic:", document.getElementById("publicKeyMnemonic").value);
+                } catch (error) {
+                    console.error("Error in generateKeys:", error);
+                    alert("Failed to generate keys: " + error.message);
+                }
+            };
+
+            window.deriveSharedSecret = function() {
+                if (!privateKey) {
+                    alert("Generate your keypair first!");
+                    return;
+                }
+
+                const partnerKeyMnemonic = document.getElementById("partnerKeyMnemonic").value.trim();
+                if (!partnerKeyMnemonic) {
+                    alert("Enter a valid partner public key!");
+                    return;
+                }
+
+                try {
+                    const partnerKeyBytes = mnemonic.decode(partnerKeyMnemonic);
+                    if (partnerKeyBytes.length !== 32) {
+                        throw new Error("Public key must be 32 bytes (24 words)");
+                    }
+                    const partnerKey = new Uint8Array(partnerKeyBytes);
+
+                    try {
+                        x25519.getSharedSecret(privateKey, partnerKey);
+                    } catch (e) {
+                        throw new Error("Invalid X25519 public key");
+                    }
+
+                    const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+                    const sharedSecretShort = sharedSecretFull.slice(0, 16);
+                    /* const sharedSecretHex = bytesToHex(sharedSecretShort); */
+                    const sharedSecretMnemonic = mnemonic.encode([...sharedSecretShort], "x ");
+
+                    /* document.getElementById("sharedSecretHex").value = sharedSecretHex; */
+                    document.getElementById("sharedSecretMnemonic").value = sharedSecretMnemonic;
+                } catch (error) {
+                    alert("Error: " + error.message);
+                }
+            };
+        });
+    </script>
+</body>
+</html>

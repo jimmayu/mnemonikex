@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECDH Key Exchange</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+        }
+        .light-mode {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        textarea, input {
+            width: 100%;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            padding: 8px;
+        }
+        .converter-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .convert-button {
+            width: 100px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleTheme()">Toggle Dark/Light Mode</button>
+    
+    <h2>ECDH Key Exchange</h2>
+    
+    <button onclick="generateKeys()">Generate Keypair</button>
+    
+    <h3>Your Public Key</h3>
+    <textarea id="publicKeyBase64" rows="2" readonly></textarea>
+
+    <h3>Your Private Key</h3>
+    <div class="password-container">
+        <input type="password" id="privateKeyBase64" readonly>
+    </div>
+
+    <h3>Enter Partner's Public Key</h3>
+    <textarea id="partnerKeyBase64" rows="2"></textarea>
+    
+    <button onclick="deriveSharedSecret()">Compute Shared Secret</button>
+    
+    <h3>Shared Secret</h3>
+    <textarea id="sharedSecretBase64" rows="2" readonly></textarea>
+
+
+    <script>
+        let lastInputType = "base64";
+        let privateKey, publicKey;
+
+        function toggleTheme() {
+            document.body.classList.toggle("light-mode");
+        }
+
+        function trackInput(type) {
+            lastInputType = type;
+        }
+
+        async function generateKeys() {
+            const keyPair = await window.crypto.subtle.generateKey(
+                { name: "ECDH", namedCurve: "P-256" },
+                true, ["deriveKey", "deriveBits"]
+            );
+
+            privateKey = keyPair.privateKey;
+            publicKey = keyPair.publicKey;
+
+            const exportedPubKey = await window.crypto.subtle.exportKey("spki", publicKey);
+            const exportedPrivKey = await window.crypto.subtle.exportKey("pkcs8", privateKey);
+
+            document.getElementById("publicKeyBase64").value = btoa(String.fromCharCode(...new Uint8Array(exportedPubKey)));
+            document.getElementById("privateKeyBase64").value = btoa(String.fromCharCode(...new Uint8Array(exportedPrivKey)));
+        }
+
+        async function deriveSharedSecret() {
+            if (!privateKey) {
+                alert("Generate your keypair first!");
+                return;
+            }
+
+            const partnerKeyBase64 = document.getElementById("partnerKeyBase64").value.trim();
+            if (!partnerKeyBase64) {
+                alert("Enter a valid partner public key!");
+                return;
+            }
+
+            try {
+                const partnerKeyArray = Uint8Array.from(atob(partnerKeyBase64), c => c.charCodeAt(0));
+                const partnerKey = await window.crypto.subtle.importKey(
+                    "spki", partnerKeyArray,
+                    { name: "ECDH", namedCurve: "P-256" },
+                    false, []
+                );
+
+                let sharedSecret = await window.crypto.subtle.deriveBits(
+                    { name: "ECDH", public: partnerKey },
+                    privateKey,
+                    256
+                );
+
+                sharedSecret = await window.crypto.subtle.digest("SHA-256", sharedSecret);
+                
+                document.getElementById("sharedSecretBase64").value = btoa(String.fromCharCode(...new Uint8Array(sharedSecret)));
+            } catch (error) {
+                alert("Invalid partner public key format!");
+            }
+        }
+
+        function convertKeys() {
+            try {
+                if (lastInputType === "base64") {
+                    const base64Input = document.getElementById("base64Input").value.trim();
+                    if (base64Input) {
+                        document.getElementById("rfc1751Output").value = base64ToRFC1751(base64Input);
+                    }
+                } else {
+                    const rfc1751Output = document.getElementById("rfc1751Output").value.trim();
+                    if (rfc1751Output) {
+                        document.getElementById("base64Input").value = rfc1751ToBase64(rfc1751Output);
+                    }
+                }
+            } catch (error) {
+                alert("Conversion error: " + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
