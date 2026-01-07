@@ -135,9 +135,9 @@ let privateKey;
 // ————————————————————————————————————————
 // DOM LOADED – MAIN SETUP
 // ————————————————————————————————————————
-document.addEventListener("DOMContentLoaded", function() {
+function initializeApp() {
     try {
-        console.log("DOMContentLoaded fired");
+        console.log("Initializing app");
 
         if (typeof window.nobleCurves === "undefined") throw new Error("noble-curves.js not loaded");
         if (typeof mnemonic === "undefined") throw new Error("mnemonic.js not loaded");
@@ -280,4 +280,12 @@ document.addEventListener("DOMContentLoaded", function() {
         console.error("Setup error:", error);
         alert("App failed to start: " + error.message);
     }
-});
+}
+
+// Run initialization when DOM is ready OR immediately if already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // DOM already loaded (since main.js is loaded dynamically)
+    initializeApp();
+}
