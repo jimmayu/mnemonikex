@@ -81,15 +81,22 @@
     <script src="mn_words.js"></script>
     <script src="mnemonic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/awesomplete@1.1.5/awesomplete.min.js"></script>
-    <script type="module">
-        import * as curves from 'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/+esm';
-        window.nobleCurves = curves;
-        console.log("noble-curves loaded from CDN:", typeof window.nobleCurves);
+    <script>
+        // Use dynamic import in a regular script to avoid nginx stripping type="module"
+        (async function() {
+            try {
+                const curves = await import('https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/+esm');
+                window.nobleCurves = curves;
+                console.log("noble-curves loaded from CDN:", typeof window.nobleCurves);
 
-        // Load main.js after noble-curves is ready
-        const script = document.createElement('script');
-        script.src = 'main.js';
-        document.body.appendChild(script);
+                // Load main.js after noble-curves is ready
+                const script = document.createElement('script');
+                script.src = 'main.js';
+                document.body.appendChild(script);
+            } catch (error) {
+                console.error("Failed to load noble-curves:", error);
+            }
+        })();
     </script>
 </body>
 </html>
