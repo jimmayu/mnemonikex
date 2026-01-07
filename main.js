@@ -1,8 +1,5 @@
 // main.js
 console.log("Main script started");
-console.log("nobleCurves immediate check:", typeof nobleCurves);
-console.log("mnemonic immediate check:", typeof mnemonic);
-console.log("mn_words immediate check:", typeof mn_words);
 
 const DH_PARAMS = { p: 2n ** 128n - 159n, g: 2n };
 const LOW_DH_P = 2n ** 192n - 2n ** 64n - 1n; // Approximate 192-bit prime for low mode
@@ -142,12 +139,16 @@ document.addEventListener("DOMContentLoaded", function() {
     try {
         console.log("DOMContentLoaded fired");
 
-        if (typeof nobleCurves === "undefined") throw new Error("noble-curves.js not loaded");
+        if (typeof window.nobleCurves === "undefined") throw new Error("noble-curves.js not loaded");
         if (typeof mnemonic === "undefined") throw new Error("mnemonic.js not loaded");
         if (typeof mn_words === "undefined") throw new Error("mn_words not defined");
         if (typeof Awesomplete === "undefined") throw new Error("Awesomplete not loaded");
 
         console.log("All dependencies loaded");
+        console.log("nobleCurves:", typeof window.nobleCurves);
+        console.log("mnemonic:", typeof mnemonic);
+        console.log("mn_words:", typeof mn_words);
+        console.log("Awesomplete:", typeof Awesomplete);
 
         updateInputFields();
 
@@ -189,7 +190,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     privateKey[0] &= 248;
                     privateKey[31] &= 127;
                     privateKey[31] |= 64;
-                    const curve = nobleCurves.x25519;
+                    const curve = window.nobleCurves.x25519;
                     const publicKey = curve.getPublicKey(privateKey);
                     const pubKeyMnemonic = mnemonic.encode([...publicKey], getMnemonicFormat(wordCount));
                     const privKeyMnemonic = mnemonic.encode([...privateKey], getMnemonicFormat(wordCount));
@@ -253,7 +254,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     sharedSecretShort = sharedBytes.slice(0, 16);
                 } else {
                     // Existing ECDH logic
-                    const curve = nobleCurves.x25519;
+                    const curve = window.nobleCurves.x25519;
                     const partnerKey = new Uint8Array(partnerKeyBytes);
                     const sharedSecretFull = curve.getSharedSecret(privateKey, partnerKey);
                     sharedSecretShort = sharedSecretFull.slice(0, 16);
