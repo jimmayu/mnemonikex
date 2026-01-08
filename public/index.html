@@ -80,23 +80,8 @@
     -->
     <script src="mn_words.js"></script>
     <script src="mnemonic.js"></script>
-    <script src="awesomplete.min.js"></script>
-    <script>
-        // Use dynamic import in a regular script to avoid nginx stripping type="module"
-        (async function() {
-            try {
-                const curves = await import('./noble-curves.js');
-                window.nobleCurves = curves;
-                console.log("noble-curves loaded from CDN:", typeof window.nobleCurves);
-
-                // Load main.js after noble-curves is ready
-                const script = document.createElement('script');
-                script.src = 'main.js';
-                document.body.appendChild(script);
-            } catch (error) {
-                console.error("Failed to load noble-curves:", error);
-            }
-        })();
-    </script>
+    <script src="noble-curves.js"></script>
+    <script src="awesomplete-gh-pages/awesomplete.min.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>

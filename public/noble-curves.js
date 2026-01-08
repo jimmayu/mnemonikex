@@ -995,3 +995,7 @@ var nobleCurves = (() => {
         throw new E("invalid signature: left bytes after parsing");
       return { r: int.decode(rBytes), s: int.decode(sBytes) };
     },
+
+  })();
+
+  window.nobleCurves = nobleCurves;
