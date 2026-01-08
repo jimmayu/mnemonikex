@@ -40,7 +40,9 @@ var nobleCurves = (() => {
   });
 
   // Assign to global scope for browser use
+  console.log("noble-curves: About to assign to window.nobleCurves", input_exports);
   window.nobleCurves = input_exports;
+  console.log("noble-curves: Assigned to window.nobleCurves", window.nobleCurves);
 
   // ../../esm/abstract/utils.js
   var utils_exports = {};
