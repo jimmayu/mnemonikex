@@ -1,9 +1,8 @@
 // main.js (ES Module version)
-
 console.log("Main script started");
 
-// Import only what we need from @noble/curves (x25519 is inside ed25519 module)
-import { x25519 } from 'https://cdn.jsdelivr.net/npm/@noble/curves@latest/ed25519.js';
+// Reliable import for @noble/curves that resolves internal dependencies correctly
+import { x25519 } from 'https://esm.sh/@noble/curves@1/ed25519.js';
 
 const DH_PARAMS = { p: 2n ** 128n - 159n, g: 2n };
 const LOW_DH_P = 2n ** 192n - 2n ** 64n - 1n; // Approximate 192-bit prime for low mode
@@ -43,34 +42,33 @@ window.onerror = function(msg, url, line) {
     alert("Oops! Something went wrong. Try refreshing the page or starting over.");
 };
 
+// Exposed globally for copy buttons
 function copyToClipboard(id) {
     const textarea = document.getElementById(id);
     textarea.select();
     document.execCommand("copy");
-    const button = event.target;
-    button.textContent = "Copied!";
-    setTimeout(() => { button.textContent = "Copy"; }, 2000);
+    
+    // Find the button that triggered this (via data-target)
+    const button = document.querySelector(`.copy-btn[data-target="${id}"]`);
+    if (button) {
+        const originalText = button.textContent;
+        button.textContent = "Copied!";
+        setTimeout(() => { button.textContent = originalText; }, 2000);
+    }
 }
+window.copyToClipboard = copyToClipboard; // Make available globally
 
 function generateSuggestedPassword(sharedSecretBytes) {
     const charSet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
     const byteLength = sharedSecretBytes.length;
-    let len;
-    if (byteLength === 16) {
-        len = 20;
-    } else {
-        len = Math.max(12, Math.ceil(byteLength * 8 / 6));
-    }
-    console.log(`Generating password for ${byteLength} bytes, target length: ${len}`);
+    let len = (byteLength === 16) ? 20 : Math.max(12, Math.ceil(byteLength * 8 / 6));
+    
     for (let i = 0; i < len; i++) {
         const index = sharedSecretBytes[i % byteLength] ^ sharedSecretBytes[(i + 1) % byteLength];
         password += charSet[index % charSet.length];
     }
-    if (password.length !== len) {
-        password = password.slice(0, len);
-    }
-    return password;
+    return password.slice(0, len);
 }
 
 function updateWordCount() {
@@ -89,7 +87,6 @@ function updateWordCount() {
 function updateInputFields() {
     const inputContainer = document.getElementById("partnerKeyInputs");
     inputContainer.innerHTML = '';
-    console.log("Updating input fields for", wordCount, "words");
     for (let i = 0; i < wordCount; i++) {
         const pair = document.createElement("div");
         pair.className = "word-pair";
@@ -106,7 +103,7 @@ function updateInputFields() {
         pair.appendChild(label);
         pair.appendChild(input);
         inputContainer.appendChild(pair);
-
+        
         new Awesomplete(input, {
             list: mn_words.slice(1),
             minChars: 2,
@@ -131,15 +128,16 @@ let privateKey;
 
 function toggleTheme() {
     document.body.classList.toggle("light-mode");
-    const button = document.querySelector("button.toggle-theme");
+    const button = document.querySelector(".toggle-theme");
     button.textContent = document.body.classList.contains("light-mode")
         ? "Switch to Dark Mode"
         : "Switch to Light Mode";
 }
 
 function generateKeys() {
-    const loading = document.querySelector("button.generate-keys .loading");
-    loading.style.display = "inline";
+    const loading = document.querySelector(".generate-keys .loading");
+    if (loading) loading.style.display = "inline";
+    
     console.log("Generating keypair...");
     try {
         if (mode === 'demo' || mode === 'low') {
@@ -163,46 +161,53 @@ function generateKeys() {
             document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
             document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
         }
-        loading.style.display = "none";
+        if (loading) loading.style.display = "none";
         console.log("Keys generated and displayed");
     } catch (err) {
         console.error("generateKeys error:", err);
         alert("Failed to generate keys. Try again.");
-        loading.style.display = "none";
+        if (loading) loading.style.display = "none";
     }
 }
 
 function deriveSharedSecret() {
     const confirmed = confirm("Have you confirmed your friend’s voice over a call? Press OK to continue.");
     if (!confirmed) return;
-    const loading = document.querySelector("button.derive-secret .loading");
-    loading.style.display = "inline";
+    
+    const loading = document.querySelector(".derive-secret .loading");
+    if (loading) loading.style.display = "inline";
+    
     try {
         if (!privateKey) {
             alert("Create your codes first!");
-            loading.style.display = "none";
+            if (loading) loading.style.display = "none";
             return;
         }
+        
         const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
         const words = Array.from(inputs)
             .map(i => i.value.trim())
             .filter(w => w.length > 0);
+            
         if (words.length !== wordCount) {
             alert(`Please enter all ${wordCount} words.`);
-            loading.style.display = "none";
+            if (loading) loading.style.display = "none";
             return;
         }
+        
         const validWords = new Set(mn_words.slice(1));
         const invalid = words.filter(w => !validWords.has(w.toLowerCase()));
         if (invalid.length > 0) {
             alert(`Invalid words: ${invalid.join(", ")}`);
-            loading.style.display = "none";
+            if (loading) loading.style.display = "none";
             return;
         }
+        
         const partnerKeyBytes = mnemonic.decode(words.join(" "));
         if (partnerKeyBytes.length !== keySizeBytes) {
             throw new Error(`Partner key must be ${keySizeBytes} bytes`);
         }
+        
         let sharedSecretShort;
         if (mode === 'demo' || mode === 'low') {
             const len = mode === 'demo' ? 16 : 24;
@@ -216,34 +221,44 @@ function deriveSharedSecret() {
             const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
             sharedSecretShort = sharedSecretFull.slice(0, 16);
         }
+        
         const sharedMnemonic = mnemonic.encode([...sharedSecretShort], getMnemonicFormat(12));
         const password = generateSuggestedPassword(sharedSecretShort);
+        
         document.getElementById("sharedSecretMnemonic").value = sharedMnemonic;
         document.getElementById("suggestedSharedPassword").value = password;
-        loading.style.display = "none";
+        
+        if (loading) loading.style.display = "none";
         console.log("Shared secret generated");
     } catch (err) {
         console.error("deriveSharedSecret error:", err);
         alert("Invalid public key. Check the words and try again.");
-        loading.style.display = "none";
+        if (loading) loading.style.display = "none";
     }
 }
 
 function initializeApp() {
     try {
         console.log("Initializing app");
-        // Removed noble-curves global check – we imported it directly
         if (typeof mnemonic === "undefined") throw new Error("mnemonic.js not loaded");
         if (typeof mn_words === "undefined") throw new Error("mn_words not defined");
         if (typeof Awesomplete === "undefined") throw new Error("Awesomplete not loaded");
-
+        
         updateInputFields();
-
-        // Event listeners (replaces inline onclick)
-        document.querySelector("button.toggle-theme").addEventListener("click", toggleTheme);
-        document.querySelector("button.generate-keys").addEventListener("click", generateKeys);
-        document.querySelector("button.derive-secret").addEventListener("click", deriveSharedSecret);
-
+        
+        // Event listeners
+        document.querySelector(".toggle-theme").addEventListener("click", toggleTheme);
+        document.querySelector(".generate-keys").addEventListener("click", generateKeys);
+        document.querySelector(".derive-secret").addEventListener("click", deriveSharedSecret);
+        
+        // Copy buttons using data-target
+        document.querySelectorAll(".copy-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const targetId = btn.getAttribute("data-target");
+                if (targetId) copyToClipboard(targetId);
+            });
+        });
+        
         document.getElementById('securityLevel').addEventListener('change', (e) => {
             const val = e.target.value;
             mode = val;
@@ -251,16 +266,16 @@ function initializeApp() {
             wordCount = val === 'demo' ? 12 : (val === 'low' ? 18 : 24);
             updateInputFields();
             document.getElementById('demoWarning').style.display = val === 'demo' ? 'block' : 'none';
-            // Clear previous keys when changing mode
+            
+            // Clear previous keys
             document.getElementById("publicKeyMnemonic").value = "";
             document.getElementById("privateKeyMnemonic").value = "";
             document.getElementById("sharedSecretMnemonic").value = "";
             document.getElementById("suggestedSharedPassword").value = "";
             privateKey = undefined;
         });
-
+        
         document.getElementById('demoWarning').style.display = 'none';
-
         console.log("App initialized successfully");
     } catch (error) {
         console.error("Setup error:", error);
@@ -268,5 +283,4 @@ function initializeApp() {
     }
 }
 
-// Run when DOM is ready
 document.addEventListener('DOMContentLoaded', initializeApp);
