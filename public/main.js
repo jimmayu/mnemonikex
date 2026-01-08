@@ -1,8 +1,13 @@
-// main.js
+// main.js (ES Module version)
+
 console.log("Main script started");
+
+// Import only what we need from @noble/curves (x25519 is inside ed25519 module)
+import { x25519 } from 'https://cdn.jsdelivr.net/npm/@noble/curves@latest/ed25519.js';
 
 const DH_PARAMS = { p: 2n ** 128n - 159n, g: 2n };
 const LOW_DH_P = 2n ** 192n - 2n ** 64n - 1n; // Approximate 192-bit prime for low mode
+
 function modPow(base, exp, mod) {
   let res = 1n;
   base = base % mod;
@@ -13,6 +18,7 @@ function modPow(base, exp, mod) {
   }
   return res;
 }
+
 function bigIntToBytes(n, len) {
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
@@ -21,6 +27,7 @@ function bigIntToBytes(n, len) {
   }
   return bytes;
 }
+
 function bytesToBigInt(bytes) {
   return bytes.reduce((n, b) => (n << 8n) | BigInt(b), 0n);
 }
@@ -79,35 +86,27 @@ function updateWordCount() {
     });
 }
 
-// ————————————————————————————————————————
-// UPDATE INPUT FIELDS – CORRECT LAYOUT
-// ————————————————————————————————————————
 function updateInputFields() {
     const inputContainer = document.getElementById("partnerKeyInputs");
     inputContainer.innerHTML = '';
     console.log("Updating input fields for", wordCount, "words");
-
     for (let i = 0; i < wordCount; i++) {
         const pair = document.createElement("div");
         pair.className = "word-pair";
-
         const label = document.createElement("label");
         label.textContent = `${i + 1}:`;
         label.className = "word-num";
         label.setAttribute("aria-label", `Word number ${i + 1}`);
-
         const input = document.createElement("input");
         input.type = "text";
         input.className = "word-input";
         input.maxLength = 7;
         input.setAttribute("aria-label", `Enter word ${i + 1}`);
         input.addEventListener("input", updateWordCount);
-
         pair.appendChild(label);
         pair.appendChild(input);
         inputContainer.appendChild(pair);
 
-        // ——— AWESOMPLETE (NO TAB FIX) ———
         new Awesomplete(input, {
             list: mn_words.slice(1),
             minChars: 2,
@@ -117,8 +116,6 @@ function updateInputFields() {
             emptyMsg: ""
         });
     }
-
-    console.log("Created", wordCount, "input pairs");
     document.getElementById("wordCount").textContent = `Words entered: 0/${wordCount}`;
     document.getElementById("publicKeyHeader").textContent = `Your Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
     document.getElementById("privateKeyHeader").textContent = mode === 'demo' ? "Your Private Key (hidden in demo mode)" : `Your Private Key (${wordCount} words)`;
@@ -132,160 +129,144 @@ let wordCount = 24;
 let mode = 'high';
 let privateKey;
 
-// ————————————————————————————————————————
-// DOM LOADED – MAIN SETUP
-// ————————————————————————————————————————
+function toggleTheme() {
+    document.body.classList.toggle("light-mode");
+    const button = document.querySelector("button.toggle-theme");
+    button.textContent = document.body.classList.contains("light-mode")
+        ? "Switch to Dark Mode"
+        : "Switch to Light Mode";
+}
+
+function generateKeys() {
+    const loading = document.querySelector("button.generate-keys .loading");
+    loading.style.display = "inline";
+    console.log("Generating keypair...");
+    try {
+        if (mode === 'demo' || mode === 'low') {
+            const len = mode === 'demo' ? 16 : 24;
+            const privBytes = crypto.getRandomValues(new Uint8Array(len));
+            privateKey = bytesToBigInt(privBytes);
+            const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
+            const pub = modPow(DH_PARAMS.g, privateKey, p);
+            const pubBytes = bigIntToBytes(pub, len);
+            const pubMnemonic = mnemonic.encode([...pubBytes], getMnemonicFormat(wordCount));
+            document.getElementById("publicKeyMnemonic").value = pubMnemonic;
+            document.getElementById("privateKeyMnemonic").value = "Hidden (" + mode + " mode)";
+        } else {
+            privateKey = crypto.getRandomValues(new Uint8Array(32));
+            privateKey[0] &= 248;
+            privateKey[31] &= 127;
+            privateKey[31] |= 64;
+            const publicKey = x25519.getPublicKey(privateKey);
+            const pubKeyMnemonic = mnemonic.encode([...publicKey], getMnemonicFormat(wordCount));
+            const privKeyMnemonic = mnemonic.encode([...privateKey], getMnemonicFormat(wordCount));
+            document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+            document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
+        }
+        loading.style.display = "none";
+        console.log("Keys generated and displayed");
+    } catch (err) {
+        console.error("generateKeys error:", err);
+        alert("Failed to generate keys. Try again.");
+        loading.style.display = "none";
+    }
+}
+
+function deriveSharedSecret() {
+    const confirmed = confirm("Have you confirmed your friend’s voice over a call? Press OK to continue.");
+    if (!confirmed) return;
+    const loading = document.querySelector("button.derive-secret .loading");
+    loading.style.display = "inline";
+    try {
+        if (!privateKey) {
+            alert("Create your codes first!");
+            loading.style.display = "none";
+            return;
+        }
+        const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
+        const words = Array.from(inputs)
+            .map(i => i.value.trim())
+            .filter(w => w.length > 0);
+        if (words.length !== wordCount) {
+            alert(`Please enter all ${wordCount} words.`);
+            loading.style.display = "none";
+            return;
+        }
+        const validWords = new Set(mn_words.slice(1));
+        const invalid = words.filter(w => !validWords.has(w.toLowerCase()));
+        if (invalid.length > 0) {
+            alert(`Invalid words: ${invalid.join(", ")}`);
+            loading.style.display = "none";
+            return;
+        }
+        const partnerKeyBytes = mnemonic.decode(words.join(" "));
+        if (partnerKeyBytes.length !== keySizeBytes) {
+            throw new Error(`Partner key must be ${keySizeBytes} bytes`);
+        }
+        let sharedSecretShort;
+        if (mode === 'demo' || mode === 'low') {
+            const len = mode === 'demo' ? 16 : 24;
+            const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
+            const partnerPub = bytesToBigInt(partnerKeyBytes);
+            const shared = modPow(partnerPub, privateKey, p);
+            const sharedBytes = bigIntToBytes(shared, len);
+            sharedSecretShort = sharedBytes.slice(0, 16);
+        } else {
+            const partnerKey = new Uint8Array(partnerKeyBytes);
+            const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+            sharedSecretShort = sharedSecretFull.slice(0, 16);
+        }
+        const sharedMnemonic = mnemonic.encode([...sharedSecretShort], getMnemonicFormat(12));
+        const password = generateSuggestedPassword(sharedSecretShort);
+        document.getElementById("sharedSecretMnemonic").value = sharedMnemonic;
+        document.getElementById("suggestedSharedPassword").value = password;
+        loading.style.display = "none";
+        console.log("Shared secret generated");
+    } catch (err) {
+        console.error("deriveSharedSecret error:", err);
+        alert("Invalid public key. Check the words and try again.");
+        loading.style.display = "none";
+    }
+}
+
 function initializeApp() {
     try {
         console.log("Initializing app");
-
-        if (typeof window.nobleCurves === "undefined") throw new Error("noble-curves.js not loaded");
+        // Removed noble-curves global check – we imported it directly
         if (typeof mnemonic === "undefined") throw new Error("mnemonic.js not loaded");
         if (typeof mn_words === "undefined") throw new Error("mn_words not defined");
         if (typeof Awesomplete === "undefined") throw new Error("Awesomplete not loaded");
 
-        console.log("All dependencies loaded");
-        console.log("nobleCurves:", typeof window.nobleCurves);
-        console.log("mnemonic:", typeof mnemonic);
-        console.log("mn_words:", typeof mn_words);
-        console.log("Awesomplete:", typeof Awesomplete);
-
         updateInputFields();
 
-        document.getElementById('securityLevel').addEventListener('change', () => {
-            const val = event.target.value;
+        // Event listeners (replaces inline onclick)
+        document.querySelector("button.toggle-theme").addEventListener("click", toggleTheme);
+        document.querySelector("button.generate-keys").addEventListener("click", generateKeys);
+        document.querySelector("button.derive-secret").addEventListener("click", deriveSharedSecret);
+
+        document.getElementById('securityLevel').addEventListener('change', (e) => {
+            const val = e.target.value;
             mode = val;
             keySizeBytes = val === 'demo' ? 16 : (val === 'low' ? 24 : 32);
             wordCount = val === 'demo' ? 12 : (val === 'low' ? 18 : 24);
             updateInputFields();
             document.getElementById('demoWarning').style.display = val === 'demo' ? 'block' : 'none';
+            // Clear previous keys when changing mode
+            document.getElementById("publicKeyMnemonic").value = "";
+            document.getElementById("privateKeyMnemonic").value = "";
+            document.getElementById("sharedSecretMnemonic").value = "";
+            document.getElementById("suggestedSharedPassword").value = "";
+            privateKey = undefined;
         });
 
-        window.toggleTheme = function() {
-            document.body.classList.toggle("light-mode");
-            const button = document.querySelector("button[onclick='toggleTheme()']");
-            button.textContent = document.body.classList.contains("light-mode")
-                ? "Switch to Dark Mode"
-                : "Switch to Light Mode";
-        };
+        document.getElementById('demoWarning').style.display = 'none';
 
-        window.generateKeys = function() {
-            const loading = document.querySelector("button[onclick='generateKeys()'] .loading");
-            loading.style.display = "inline";
-            console.log("Generating keypair...");
-
-            try {
-                if (mode === 'demo' || mode === 'low') {
-                    const len = mode === 'demo' ? 16 : 24;
-                    const privBytes = crypto.getRandomValues(new Uint8Array(len));
-                    privateKey = bytesToBigInt(privBytes);
-                    const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
-                    const pub = modPow(DH_PARAMS.g, privateKey, p);
-                    const pubBytes = bigIntToBytes(pub, len);
-                    const pubMnemonic = mnemonic.encode([...pubBytes], getMnemonicFormat(wordCount));
-                    document.getElementById("publicKeyMnemonic").value = pubMnemonic;
-                    document.getElementById("privateKeyMnemonic").value = "Hidden (" + mode + " mode)";
-                } else {
-                    privateKey = crypto.getRandomValues(new Uint8Array(32));
-                    privateKey[0] &= 248;
-                    privateKey[31] &= 127;
-                    privateKey[31] |= 64;
-                    const curve = window.nobleCurves.x25519;
-                    const publicKey = curve.getPublicKey(privateKey);
-                    const pubKeyMnemonic = mnemonic.encode([...publicKey], getMnemonicFormat(wordCount));
-                    const privKeyMnemonic = mnemonic.encode([...privateKey], getMnemonicFormat(wordCount));
-                    document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
-                    document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
-                }
-                loading.style.display = "none";
-                console.log("Keys generated and displayed");
-            } catch (err) {
-                console.error("generateKeys error:", err);
-                alert("Failed to generate keys. Try again.");
-                loading.style.display = "none";
-            }
-        };
-
-        window.deriveSharedSecret = function() {
-            const confirmed = confirm("Have you confirmed your friend’s voice over a call? Press OK to continue.");
-            if (!confirmed) return;
-
-            const loading = document.querySelector("button[onclick='deriveSharedSecret()'] .loading");
-            loading.style.display = "inline";
-
-            try {
-                if (!privateKey) {
-                    alert("Create your codes first!");
-                    loading.style.display = "none";
-                    return;
-                }
-
-                const inputs = document.querySelectorAll("#partnerKeyInputs .word-input");
-                const words = Array.from(inputs)
-                    .map(i => i.value.trim())
-                    .filter(w => w.length > 0);
-
-                if (words.length !== wordCount) {
-                    alert(`Please enter all ${wordCount} words.`);
-                    loading.style.display = "none";
-                    return;
-                }
-
-                const validWords = new Set(mn_words.slice(1));
-                const invalid = words.filter(w => !validWords.has(w.toLowerCase()));
-                if (invalid.length > 0) {
-                    alert(`Invalid words: ${invalid.join(", ")}`);
-                    loading.style.display = "none";
-                    return;
-                }
-
-                const partnerKeyBytes = mnemonic.decode(words.join(" "));
-                if (partnerKeyBytes.length !== keySizeBytes) {
-                    throw new Error(`Partner key must be ${keySizeBytes} bytes`);
-                }
-
-                let sharedSecretShort;
-                if (mode === 'demo' || mode === 'low') {
-                    const len = mode === 'demo' ? 16 : 24;
-                    const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
-                    const partnerPub = bytesToBigInt(partnerKeyBytes);
-                    const shared = modPow(partnerPub, privateKey, p);
-                    const sharedBytes = bigIntToBytes(shared, len);
-                    sharedSecretShort = sharedBytes.slice(0, 16);
-                } else {
-                    // Existing ECDH logic
-                    const curve = window.nobleCurves.x25519;
-                    const partnerKey = new Uint8Array(partnerKeyBytes);
-                    const sharedSecretFull = curve.getSharedSecret(privateKey, partnerKey);
-                    sharedSecretShort = sharedSecretFull.slice(0, 16);
-                }
-
-                const sharedMnemonic = mnemonic.encode([...sharedSecretShort], getMnemonicFormat(12));
-                const password = generateSuggestedPassword(sharedSecretShort);
-
-                document.getElementById("sharedSecretMnemonic").value = sharedMnemonic;
-                document.getElementById("suggestedSharedPassword").value = password;
-                document.getElementById("sharedSecretHeader").textContent = "Your Secret Code (12 words)";
-
-                loading.style.display = "none";
-                console.log("Shared secret generated");
-            } catch (err) {
-                console.error("deriveSharedSecret error:", err);
-                alert("Invalid public key. Check the words and try again.");
-                loading.style.display = "none";
-            }
-        };
-
+        console.log("App initialized successfully");
     } catch (error) {
         console.error("Setup error:", error);
         alert("App failed to start: " + error.message);
     }
 }
 
-// Run initialization when DOM is ready OR immediately if already loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-    // DOM already loaded (since main.js is loaded dynamically)
-    initializeApp();
-}
+// Run when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeApp);
