@@ -297,7 +297,7 @@ _.prototype = {
 
 			var allowed = $.fire(this.input, "awesomplete-select", {
 				text: suggestion,
-				origin: origin || selected,
+				origin: origin,
 				originalEvent: originalEvent
 			});
 
@@ -357,7 +357,7 @@ _.prototype = {
 
 			this.close({ reason: "nomatches" });
 
-			if (this.minChar <= 1 || value.length >= this.minChars) {
+			if (this.minChars <= 1 || value.length >= this.minChars) {
 			   this.status.textContent = this.statusNoResults;
 			} else {
 			   this.status.textContent = this.statusTypeXChar.replaceAll('{0}', this.minChars); // Type N or more characters for results
