@@ -39,6 +39,9 @@ var nobleCurves = (() => {
     x448: () => x448
   });
 
+  // Assign to global scope for browser use
+  window.nobleCurves = input_exports;
+
   // ../../esm/abstract/utils.js
   var utils_exports = {};
   __export(utils_exports, {
@@ -996,6 +999,5 @@ var nobleCurves = (() => {
       return { r: int.decode(rBytes), s: int.decode(sBytes) };
     },
 
+  return undefined;
   })();
-
-  window.nobleCurves = nobleCurves;
