@@ -1006,5 +1006,4 @@ var nobleCurves = (() => {
       return { r: int.decode(rBytes), s: int.decode(sBytes) };
     },
 
-  return undefined;
   })();
