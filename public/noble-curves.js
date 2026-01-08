@@ -1,4 +1,6 @@
+// noble-curves minimal test
 "use strict";
+console.log("noble-curves: script started");
 var nobleCurves = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
