@@ -186,8 +186,10 @@ select {
 /* No overrides needed for light mode, as Awesomplete defaults work fine */
 
 .demo-option {
-    color: red;
+    color: #d32f2f;
     font-weight: bold;
+    background: linear-gradient(45deg, #ffebee, #ffcdd2);
+    border: 2px solid #d32f2f;
 }
 
 /* =============================================================

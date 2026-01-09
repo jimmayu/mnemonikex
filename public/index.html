@@ -38,7 +38,12 @@
                 </li>
             </ol>
         </section>
-        <div id="securityLevel" style="color: #666666; font-size: 0.9em;">High Security Mode (256-bit X25519 ECDH, 24 word keys)</div>
+        <select id="securityLevel">
+            <option value="high">High Security (256-bit, 24 words)</option>
+            <option value="low">⚠️ Low Security (192-bit, 18 words) - Testing only</option>
+            <option value="demo" class="demo-option">🚫 Demo DH (128-bit, 12 words) - Educational only 🚫</option>
+        </select>
+        <p id="demoWarning" style="color: red; display: none;">⚠️ LOW SECURITY MODE ACTIVATED - Do NOT use for confidential communications!<br>These weak cryptography settings are provided for educational/testing purposes only.</p>
         
         <button class="generate-keys">Create My Codes <span class="loading" style="display:none;">⏳</span></button>
         
