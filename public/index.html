@@ -38,12 +38,7 @@
                 </li>
             </ol>
         </section>
-        <select id="securityLevel">
-            <option value="high">High Security (256-bit, 24 words)</option>
-            <option value="low">Low Security (192-bit, 18 words)</option>
-            <option value="demo" class="demo-option">Demo DH (128-bit, 12 words) ⚠️</option>
-        </select>
-        <p id="demoWarning" style="color: red; display: none;">⚠️ Demo mode uses weak 128-bit keys! Just for learning; real security needs bigger keys. Snoops might crack this.</p>
+        <div id="securityLevel" style="color: #666666; font-size: 0.9em;">High Security Mode (256-bit X25519 ECDH, 24 word keys)</div>
         
         <button class="generate-keys">Create My Codes <span class="loading" style="display:none;">⏳</span></button>
         

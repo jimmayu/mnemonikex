@@ -4,32 +4,7 @@ console.log("Main script started");
 // Reliable import for @noble/curves that resolves internal dependencies correctly
 import { x25519 } from 'https://esm.sh/@noble/curves@1/ed25519.js';
 
-const DH_PARAMS = { p: 2n ** 128n - 159n, g: 2n };
-const LOW_DH_P = 2n ** 192n - 2n ** 64n - 1n; // Approximate 192-bit prime for low mode
 
-function modPow(base, exp, mod) {
-  let res = 1n;
-  base = base % mod;
-  while (exp > 0n) {
-    if (exp & 1n) res = (res * base) % mod;
-    base = (base * base) % mod;
-    exp >>= 1n;
-  }
-  return res;
-}
-
-function bigIntToBytes(n, len) {
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[len - 1 - i] = Number(n & 255n);
-    n >>= 8n;
-  }
-  return bytes;
-}
-
-function bytesToBigInt(bytes) {
-  return bytes.reduce((n, b) => (n << 8n) | BigInt(b), 0n);
-}
 
 function getMnemonicFormat(wordCount) {
   const group = "x x x ";
@@ -114,16 +89,15 @@ function updateInputFields() {
         });
     }
     document.getElementById("wordCount").textContent = `Words entered: 0/${wordCount}`;
-    document.getElementById("publicKeyHeader").textContent = `Your Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
-    document.getElementById("privateKeyHeader").textContent = mode === 'demo' ? "Your Private Key (hidden in demo mode)" : `Your Private Key (${wordCount} words)`;
-    document.getElementById("partnerKeyHeader").textContent = `Enter Your Buddy’s Public ${mode === 'demo' ? 'Key' : 'Address'} (${wordCount} words)`;
+    document.getElementById("publicKeyHeader").textContent = `Your Public Address (${wordCount} words)`;
+    document.getElementById("privateKeyHeader").textContent = `Your Private Key (${wordCount} words)`;
+    document.getElementById("partnerKeyHeader").textContent = `Enter Your Buddy's Public Address (${wordCount} words)`;
     document.getElementById("sharedSecretHeader").textContent = "Your Secret Code (12 words)";
 }
 
-// Global variables
+// Global variables - Always use high security X25519
 let keySizeBytes = 32;
 let wordCount = 24;
-let mode = 'high';
 let privateKey;
 
 function toggleTheme() {
@@ -137,30 +111,19 @@ function toggleTheme() {
 function generateKeys() {
     const loading = document.querySelector(".generate-keys .loading");
     if (loading) loading.style.display = "inline";
-    
+
     console.log("Generating keypair...");
     try {
-        if (mode === 'demo' || mode === 'low') {
-            const len = mode === 'demo' ? 16 : 24;
-            const privBytes = crypto.getRandomValues(new Uint8Array(len));
-            privateKey = bytesToBigInt(privBytes);
-            const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
-            const pub = modPow(DH_PARAMS.g, privateKey, p);
-            const pubBytes = bigIntToBytes(pub, len);
-            const pubMnemonic = mnemonic.encode([...pubBytes], getMnemonicFormat(wordCount));
-            document.getElementById("publicKeyMnemonic").value = pubMnemonic;
-            document.getElementById("privateKeyMnemonic").value = "Hidden (" + mode + " mode)";
-        } else {
-            privateKey = crypto.getRandomValues(new Uint8Array(32));
-            privateKey[0] &= 248;
-            privateKey[31] &= 127;
-            privateKey[31] |= 64;
-            const publicKey = x25519.getPublicKey(privateKey);
-            const pubKeyMnemonic = mnemonic.encode([...publicKey], getMnemonicFormat(wordCount));
-            const privKeyMnemonic = mnemonic.encode([...privateKey], getMnemonicFormat(wordCount));
-            document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
-            document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
-        }
+        // Only allow secure X25519 key generation
+        privateKey = crypto.getRandomValues(new Uint8Array(32));
+        privateKey[0] &= 248;
+        privateKey[31] &= 127;
+        privateKey[31] |= 64;
+        const publicKey = x25519.getPublicKey(privateKey);
+        const pubKeyMnemonic = mnemonic.encode([...publicKey], getMnemonicFormat(wordCount));
+        const privKeyMnemonic = mnemonic.encode([...privateKey], getMnemonicFormat(wordCount));
+        document.getElementById("publicKeyMnemonic").value = pubKeyMnemonic;
+        document.getElementById("privateKeyMnemonic").value = privKeyMnemonic;
         if (loading) loading.style.display = "none";
         console.log("Keys generated and displayed");
     } catch (err) {
@@ -208,19 +171,10 @@ function deriveSharedSecret() {
             throw new Error(`Partner key must be ${keySizeBytes} bytes`);
         }
         
-        let sharedSecretShort;
-        if (mode === 'demo' || mode === 'low') {
-            const len = mode === 'demo' ? 16 : 24;
-            const p = mode === 'demo' ? DH_PARAMS.p : LOW_DH_P;
-            const partnerPub = bytesToBigInt(partnerKeyBytes);
-            const shared = modPow(partnerPub, privateKey, p);
-            const sharedBytes = bigIntToBytes(shared, len);
-            sharedSecretShort = sharedBytes.slice(0, 16);
-        } else {
-            const partnerKey = new Uint8Array(partnerKeyBytes);
-            const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
-            sharedSecretShort = sharedSecretFull.slice(0, 16);
-        }
+        // Only use secure X25519 key derivation
+        const partnerKey = new Uint8Array(partnerKeyBytes);
+        const sharedSecretFull = x25519.getSharedSecret(privateKey, partnerKey);
+        const sharedSecretShort = sharedSecretFull.slice(0, 16);
         
         const sharedMnemonic = mnemonic.encode([...sharedSecretShort], getMnemonicFormat(12));
         const password = generateSuggestedPassword(sharedSecretShort);
@@ -258,24 +212,6 @@ function initializeApp() {
                 if (targetId) copyToClipboard(targetId);
             });
         });
-        
-        document.getElementById('securityLevel').addEventListener('change', (e) => {
-            const val = e.target.value;
-            mode = val;
-            keySizeBytes = val === 'demo' ? 16 : (val === 'low' ? 24 : 32);
-            wordCount = val === 'demo' ? 12 : (val === 'low' ? 18 : 24);
-            updateInputFields();
-            document.getElementById('demoWarning').style.display = val === 'demo' ? 'block' : 'none';
-            
-            // Clear previous keys
-            document.getElementById("publicKeyMnemonic").value = "";
-            document.getElementById("privateKeyMnemonic").value = "";
-            document.getElementById("sharedSecretMnemonic").value = "";
-            document.getElementById("suggestedSharedPassword").value = "";
-            privateKey = undefined;
-        });
-        
-        document.getElementById('demoWarning').style.display = 'none';
         console.log("App initialized successfully");
     } catch (error) {
         console.error("Setup error:", error);
