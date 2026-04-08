@@ -1,5 +1,7 @@
 # MnemoNiKex — Mnemonic Key Exchange
 
+**[Live Demo](https://jimmayu.github.io/mnemonikex)**
+
 A browser-based tool that lets two people establish a shared secret over an untrusted channel using only their voices. Built on X25519 Elliptic Curve Diffie-Hellman with human-readable mnemonic word encoding.
 
 ## What It Does
