@@ -16,8 +16,22 @@ build/
 
 # Python virtual env
 pyvenv.cfg
+bin/
+lib/
+lib64
 __pycache__/
 *.pyc
+
+# Claude Code local config
+.claude/
+
+# Awesomplete library source (only .min.js and .css are used, in public/)
+awesomplete-gh-pages/
+public/awesomplete-gh-pages/
+
+# Old prompt files
+*.prompt.md
+20251002_prompt.md
 
 # IDE files
 .vscode/
