@@ -13,11 +13,11 @@ MnemoNiKex solves a real problem: how do two people who trust each other's voice
 3. **Each person types in their partner's 24 words.** The app performs ECDH key agreement.
 4. **Both sides arrive at the same shared secret** — expressed as 12 words *and* a 20-character password.
 
-No servers. No accounts. No installation. Just open `public/index.html` in a browser.
+No servers. No accounts. No installation. Just open `docs/index.html` in a browser.
 
 ## How to Use
 
-1. Open `public/index.html` in any modern browser
+1. Open `docs/index.html` in any modern browser
 2. Click **Create My Codes** — this generates your X25519 keypair
 3. Read your **Public Address** (24 words) to your partner over a voice call
 4. Type your partner's 24 words into the numbered input fields (auto-complete helps)
@@ -55,25 +55,31 @@ The private key never leaves your browser. There is no backend.
 ## Project Layout
 
 ```
-public/
+docs/
   index.html          Main application
   main.js             Application logic (key gen, ECDH, UI)
   mnemonic.js         Mnemonic encode/decode (Oren Tirosh / Matt Brubeck)
   mn_words.js         1,633-word mnemonic wordlist
-  noble-curves.js     X25519 implementation (@noble/curves)
+  noble-curves.js     Local X25519 bundle (@noble/curves)
   styles.css          Responsive dark/light styles
-  awesomplete-gh-pages/  Auto-complete library
-test/                 Static analysis and test utilities
+  awesomplete.min.js  Auto-complete library
+  awesomplete.css
+test/                 Static checks and a browser word-entry test
 archive/              Earlier single-file iterations (dh.html → dh6)
 ```
 
 ## Running Locally
 
-No build step required. Open `public/index.html` directly in a browser, or serve the `public/` directory with any static file server:
+No build step required. Open `docs/index.html` directly in a browser, or serve the `docs/` directory with any static file server:
 
 ```bash
-python3 -m http.server 8080 --directory public
+python3 -m http.server 8080 --directory docs
 # then open http://localhost:8080
+```
+
+```bash
+node test/verify-code.js
+node test/word-entry.js
 ```
 
 ## Credits

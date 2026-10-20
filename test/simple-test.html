@@ -8,7 +8,7 @@
     <div id="result">Loading...</div>
 
     <script type="module">
-        import * as curves from 'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/+esm';
+        import * as curves from '../docs/noble-curves.js';
         window.nobleCurves = curves;
         console.log("noble-curves loaded:", typeof window.nobleCurves);
         console.log("x25519 available:", typeof window.nobleCurves.x25519);
