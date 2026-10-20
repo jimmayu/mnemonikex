@@ -1,60 +1,41 @@
-// Verify that our code changes are correct
-const fs = require('fs');
+// Static checks for the current docs/ app. Run from the repo root:
+//   node test/verify-code.js
+const fs = require("fs");
+const path = require("path");
+const { pathToFileURL } = require("url");
 
-console.log('Reading main.js...');
-const mainJs = fs.readFileSync('public/main.js', 'utf8');
+const root = path.resolve(__dirname, "..");
+const mainJs = fs.readFileSync(path.join(root, "docs/main.js"), "utf8");
+const indexHtml = fs.readFileSync(path.join(root, "docs/index.html"), "utf8");
+const styles = fs.readFileSync(path.join(root, "docs/styles.css"), "utf8");
+const curvePath = path.join(root, "docs/noble-curves.js");
 
-// Check for the fixes we made
-const checks = [
-  {
-    name: 'Removed early nobleCurves check',
-    test: !mainJs.includes('console.log("nobleCurves immediate check:", typeof nobleCurves)'),
-    issue: 'Early check should be removed from lines 2-5'
-  },
-  {
-    name: 'Uses window.nobleCurves in DOMContentLoaded check',
-    test: mainJs.includes('typeof window.nobleCurves === "undefined"'),
-    issue: 'Should check window.nobleCurves in DOMContentLoaded handler'
-  },
-  {
-    name: 'Uses window.nobleCurves.x25519',
-    test: mainJs.includes('window.nobleCurves.x25519'),
-    issue: 'Should use window.nobleCurves.x25519 when accessing the curve'
-  },
-  {
-    name: 'No bare nobleCurves.x25519 references',
-    test: !mainJs.match(/[^w]nobleCurves\.x25519/),
-    issue: 'Should not have bare nobleCurves.x25519 (without window.)'
-  }
-];
-
-console.log('\n=== Code Verification ===\n');
-
-let allPassed = true;
-checks.forEach((check, i) => {
-  const passed = check.test;
-  console.log(`${i + 1}. ${check.name}: ${passed ? '✅ PASS' : '❌ FAIL'}`);
-  if (!passed) {
-    console.log(`   Issue: ${check.issue}`);
-    allPassed = false;
-  }
-});
-
-console.log('\n=== HTML Module Script ===\n');
-const indexHtml = fs.readFileSync('public/index.html', 'utf8');
-const hasModuleScript = indexHtml.includes('type="module"') &&
-                        indexHtml.includes('window.nobleCurves = curves');
-console.log(`Module script sets window.nobleCurves: ${hasModuleScript ? '✅ PASS' : '❌ FAIL'}`);
-
-if (!hasModuleScript) {
-  allPassed = false;
+const checks = [];
+function check(name, ok) {
+  checks.push({ name, ok: !!ok });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}`);
 }
 
-console.log('\n=== Result ===\n');
-if (allPassed) {
-  console.log('✅ All checks passed! Code looks good.');
-  process.exit(0);
-} else {
-  console.log('❌ Some checks failed. Review the issues above.');
+check("curve import is local", mainJs.includes("from './noble-curves.js'"));
+check("no runtime esm.sh import", !mainJs.includes("esm.sh"));
+check("no Google Fonts stylesheet", !indexHtml.includes("fonts.googleapis.com"));
+check("page font is a system stack", styles.includes("system-ui"));
+check("copy uses the clipboard API", mainJs.includes("navigator.clipboard.writeText"));
+check("clipboard failure can fall back", mainJs.includes("copyWithExecCommand"));
+check("demo secret is 6 words / 8 bytes", /mode === "demo"\) return 6/.test(mainJs) && /mode === "demo"\) return 8/.test(mainJs));
+check("low secret is 9 words / 12 bytes", /mode === "low"\) return 9/.test(mainJs) && /mode === "low"\) return 12/.test(mainJs));
+check("weak-mode alert stack is gone", !mainJs.includes("LAST WARNING") && !mainJs.includes("You selected"));
+check("weak mode still asks before switching", mainJs.includes("Switch to it?"));
+check("private key can be shown and hidden", indexHtml.includes('id="togglePrivateKey"') && mainJs.includes("privateKeyHidden"));
+check("secret length is written into the page copy", indexHtml.includes('data-count="secret"') && indexHtml.includes('data-count="public"'));
+
+(async () => {
+  const curve = await import(pathToFileURL(curvePath).href);
+  check("local bundle exports x25519", typeof curve.x25519?.getPublicKey === "function" && typeof curve.x25519?.getSharedSecret === "function");
+  const failed = checks.filter((item) => !item.ok);
+  console.log(`\n${checks.length - failed.length} passed, ${failed.length} failed`);
+  process.exit(failed.length ? 1 : 0);
+})().catch((err) => {
+  console.error(err);
   process.exit(1);
-}
+});
