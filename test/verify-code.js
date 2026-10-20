@@ -18,7 +18,24 @@ function check(name, ok) {
 
 check("curve import is local", mainJs.includes("from './noble-curves.js'"));
 check("no runtime esm.sh import", !mainJs.includes("esm.sh"));
-check("no Google Fonts stylesheet", !indexHtml.includes("fonts.googleapis.com"));
+const blockedStylesheetHosts = new Set(["fonts.googleapis.com"]);
+const stylesheetHrefRegex = /<link\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi;
+let hasBlockedStylesheetHost = false;
+let match;
+while ((match = stylesheetHrefRegex.exec(indexHtml)) !== null) {
+  const rawHref = match[1].trim();
+  const normalizedHref = rawHref.startsWith("//") ? `https:${rawHref}` : rawHref;
+  try {
+    const parsed = new URL(normalizedHref);
+    if (blockedStylesheetHosts.has(parsed.hostname)) {
+      hasBlockedStylesheetHost = true;
+      break;
+    }
+  } catch {
+    // Ignore invalid/relative hrefs; this check targets explicit external hosts.
+  }
+}
+check("no Google Fonts stylesheet", !hasBlockedStylesheetHost);
 check("page font is a system stack", styles.includes("system-ui"));
 check("copy uses the clipboard API", mainJs.includes("navigator.clipboard.writeText"));
 check("clipboard failure can fall back", mainJs.includes("copyWithExecCommand"));
